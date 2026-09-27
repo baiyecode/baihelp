@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 端到端验收脚本 —— ch01/pure-chat（spec §10 / task-10 Step 1）
+# 端到端验收脚本 —— ch01/pure-chat + ch02/function-calling
+# （spec §10 / task-10 Step 1 立稿；ch02 task-13 扩展验收④⑤⑥）
 #
 # 前提假设（本脚本不负责满足，违反时结果无意义）：
 #   1. 服务已在运行：请在仓库根目录先执行 `uv run uvicorn app.main:app`
@@ -9,7 +10,7 @@
 #   2. 项目根目录 `.env` 已配置真实凭据（LLM_API_KEY，参考 .env.example）：
 #      服务端启动 fail-fast 依赖它，对话/抽取质量依赖真实模型。
 #
-# 三条验收：
+# 六条验收：
 #   ① 流式对话：POST /api/chat/stream（curl -N）——
 #      至少一行 `data: {"choices"` 开头的 OpenAI 兼容 delta 事件，
 #      且流的最后一个非空事件是 `data: [DONE]`。
@@ -21,8 +22,19 @@
 #      直接 grep 原始流会因 token 边界切分而漏检。
 #   ③ 结构化抽取：POST /api/extract——
 #      响应必须是可解析 JSON 且含 `complaint_type` 字段。
+#   ④ 工具调用（ch02）：POST「订单 1001 的物流到哪了」——
+#      流中至少一行 `data: {"tool"` 开头的工具事件帧（task-8 落地的帧格式：
+#      {"tool":{"name":...,"status":...}}），且末事件仍为 `data: [DONE]`；
+#      完整流与合并 delta 回答均照打留痕，回答措辞不判分。
+#   ⑤ FAQ 命中（ch02）：POST「退货政策是什么」——
+#      工具事件帧存在（query_faq 触发），且合并 delta 回答含「七天」判据词
+#      （task-5 种子 FAQ：该条 answer 含「七天」）。
+#   ⑥ 漏召回演示（ch02）：POST「邮费是多少」——
+#      种子 question 列刻意不含「邮费/运费」，query_faq 的 LIKE 查询预期
+#      落空（漏召回成立）。判据只验工具帧名含 query_faq（命中即 PASS），
+#      完整回答照打留痕，回答措辞不判分。
 #
-# 结果：逐条打印 PASS/FAIL + 汇总；三条全过 exit 0，任一失败 exit 1；
+# 结果：逐条打印 PASS/FAIL + 汇总；六条验收全部通过 exit 0，任一失败 exit 1；
 #       前置健康检查失败（服务未运行/不可达）exit 2 并给出启动提示。
 # ============================================================================
 set -euo pipefail
@@ -65,7 +77,45 @@ curl_post() { # curl_post <path> <json-body>（-N 流式；失败不中断，由
     --data-binary @"$BODY_FILE" || true
 }
 
-# 前置健康检查（不计入三条验收）：服务不可达时直接给出可操作提示。
+# 以下两个判据辅助函数供验收④⑤⑥使用，逻辑与验收②内联的 delta 合并同源：
+# 都是读 SSE 流（stdin）、用 Python 按 UTF-8 解析、写 stdout，免疫
+# Windows 控制台 locale（cp936）误解码与 JSON 转义差异。
+
+merge_delta_text() { # 合并所有 OpenAI 兼容 delta content 为完整回复文本
+  uv run python -c '
+import sys, json
+parts = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line.startswith("data: {"):
+        continue
+    try:
+        parts.append(json.loads(line[6:])["choices"][0]["delta"].get("content", ""))
+    except Exception:
+        pass
+sys.stdout.write("".join(parts))
+'
+}
+
+tool_names() { # 依次提取所有工具事件帧的 name 字段，空格分隔（无工具帧输出空串）
+  uv run python -c '
+import sys, json
+names = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line.startswith("data: {"):
+        continue
+    try:
+        tool = json.loads(line[6:]).get("tool")
+    except Exception:
+        continue
+    if isinstance(tool, dict) and tool.get("name"):
+        names.append(tool["name"])
+sys.stdout.write(" ".join(names))
+'
+}
+
+# 前置健康检查（不计入六条验收）：服务不可达时直接给出可操作提示。
 echo "== 前置检查：GET $BASE_URL/api/healthz =="
 if ! healthz="$(curl -s --connect-timeout 3 --max-time 10 "$BASE_URL/api/healthz")"; then
   echo "服务不可达：请先在仓库根目录运行 \`uv run uvicorn app.main:app\`，再执行本脚本。" >&2
@@ -140,14 +190,73 @@ fi
 report "③ 抽取：JSON 可解析且含 complaint_type" "$extract_ok"
 
 echo
+echo "== 验收④ 工具调用：POST「订单 1001 的物流到哪了」（ch02 Function Calling）=="
+stream4="$(curl_post /api/chat/stream \
+  "{\"session_id\":\"acc-4-$RUN_ID\",\"message\":\"订单 1001 的物流到哪了\"}")"
+printf '%s\n' "$stream4" | sed 's/^/  | /'
+
+# 工具事件帧判据：帧格式固定为 data: {"tool":{"name":...,"status":...}}（task-8），
+# 紧凑 JSON 无空格，直接前缀匹配即可判定「至少调用了一次工具」。
+tool4_ok=0
+grep -q '^data: {"tool"' <<<"$stream4" && tool4_ok=1
+last4="$(printf '%s\n' "$stream4" | sed -e 's/\r$//' -e '/^[[:space:]]*$/d' | tail -n 1)"
+done4_ok=0
+[[ "$last4" == "data: [DONE]" ]] && done4_ok=1
+report "④ 工具：含工具事件帧（data: {\"tool\"...）" "$tool4_ok"
+report "④ 工具：以 data: [DONE] 收尾（末事件=$last4）" "$done4_ok"
+
+# 合并 delta 回答照打留痕：物流轨迹由模型自由转述，只验走了工具，不判措辞。
+stream4_text="$(printf '%s\n' "$stream4" | merge_delta_text)"
+echo "  合并回复：$stream4_text"
+
+echo
+echo "== 验收⑤ FAQ 命中：POST「退货政策是什么」（query_faq → 种子 answer 含「七天」）=="
+stream5="$(curl_post /api/chat/stream \
+  "{\"session_id\":\"acc-5-$RUN_ID\",\"message\":\"退货政策是什么\"}")"
+printf '%s\n' "$stream5" | sed 's/^/  | /'
+
+tool5_ok=0
+grep -q '^data: {"tool"' <<<"$stream5" && tool5_ok=1
+report "⑤ FAQ：含工具事件帧（query_faq 触发）" "$tool5_ok"
+
+# 「七天」判据词在种子 answer 里，必须合并全部 delta 后再匹配（同验收②的理由）。
+stream5_text="$(printf '%s\n' "$stream5" | merge_delta_text)"
+echo "  合并回复：$stream5_text"
+seven_ok=0
+grep -qF "七天" <<<"$stream5_text" && seven_ok=1
+report "⑤ FAQ：合并回复含「七天」" "$seven_ok"
+
+echo
+echo "== 验收⑥ 漏召回演示：POST「邮费是多少」=="
+echo "  前提：种子 FAQ 的 question 列刻意不含「邮费/运费」，query_faq 的 LIKE 查询"
+echo "  预期落空——漏召回成立。本验收只判「走了 query_faq 工具」（命中即 PASS）；"
+echo "  完整回答照打留痕，回答措辞不判分（漏召回后模型如何补救不在验收范围）。"
+stream6="$(curl_post /api/chat/stream \
+  "{\"session_id\":\"acc-6-$RUN_ID\",\"message\":\"邮费是多少\"}")"
+printf '%s\n' "$stream6" | sed 's/^/  | /'
+
+faq6_names="$(printf '%s\n' "$stream6" | tool_names)"
+echo "  工具帧名：${faq6_names:-（无）}"
+faq6_ok=0
+grep -qF "query_faq" <<<"$faq6_names" && faq6_ok=1
+report "⑥ 漏召回：工具帧名含 query_faq（命中即 PASS，措辞不判分）" "$faq6_ok"
+
+# 合并回复照打留痕：LIKE 落空后模型可能道歉或给通用回答，均不作判分对象。
+stream6_text="$(printf '%s\n' "$stream6" | merge_delta_text)"
+echo "  合并回复（留痕，不判分）：$stream6_text"
+
+echo
 echo "== 验收汇总 =="
 echo "  ① 流式对话（delta 逐行 + [DONE] 收尾）: $([[ $delta_ok == 1 && $done_ok == 1 ]] && echo PASS || echo FAIL)"
 echo "  ② 上下文记忆（第二轮复述订单号）:       $([[ $ctx_ok == 1 ]] && echo PASS || echo FAIL)"
 echo "  ③ 结构化抽取（JSON + complaint_type）:  $([[ $extract_ok == 1 ]] && echo PASS || echo FAIL)"
+echo "  ④ 工具调用（工具帧 + [DONE] 收尾）:     $([[ $tool4_ok == 1 && $done4_ok == 1 ]] && echo PASS || echo FAIL)"
+echo "  ⑤ FAQ 命中（工具帧 + 回答含「七天」）:  $([[ $tool5_ok == 1 && $seven_ok == 1 ]] && echo PASS || echo FAIL)"
+echo "  ⑥ 漏召回演示（走了 query_faq 即可）:    $([[ $faq6_ok == 1 ]] && echo PASS || echo FAIL)"
 
 if [[ "$fail_count" -ne 0 ]]; then
-  echo "结论: FAIL（$pass_count/4 项判据通过）"
+  echo "结论: FAIL（$pass_count/$((pass_count + fail_count)) 项判据通过）"
   exit 1
 fi
-echo "结论: PASS（3/3）"
+echo "结论: PASS（6/6）"
 exit 0
