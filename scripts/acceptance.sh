@@ -258,5 +258,6 @@ if [[ "$fail_count" -ne 0 ]]; then
   echo "结论: FAIL（$pass_count/$((pass_count + fail_count)) 项判据通过）"
   exit 1
 fi
-echo "结论: PASS（6/6）"
+# PASS 分支同样按动态判据计数输出(与 FAIL 分支口径一致),六条验收语义用文字保留
+echo "结论: PASS(六条验收全过,$pass_count 项判据全部通过)"
 exit 0

@@ -1,5 +1,5 @@
 # ch02 · Function Calling 数据层编排
-# MySQL 8.4 实例:库 baihelp / 用户 baihelp / 密码 baihelp / 端口 3306
+# MySQL 8.4 实例:库 baihelp / 用户 baihelp / 密码 baihelp / 端口 3307(宿主映射,容器内 3306)
 # 首次启动时把 scripts/sql/ 下的 DDL 挂进 /docker-entrypoint-initdb.d 自动建表
 services:
   mysql:
