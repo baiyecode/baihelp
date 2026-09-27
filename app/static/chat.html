@@ -135,6 +135,22 @@
   .typing i:nth-child(2) { animation-delay: .25s; }
   .typing i:nth-child(3) { animation-delay: .5s; }
 
+  /* 工具轨迹徽章行：正文上方一行小徽章；:empty 时整行隐藏，普通聊天视觉零变化 */
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .badges:empty { display: none; }
+  .tool-badge {
+    display: inline-block; font-size: 12px; line-height: 1;
+    padding: 4px 8px; cursor: default;
+    background: var(--panel-deep); color: var(--blue);
+    border: 2px solid var(--line);
+    box-shadow: 2px 2px 0 rgba(39, 75, 159, .18);
+  }
+  .tool-badge.running { animation: blink 1s steps(2) infinite; } /* 复用现有像素闪烁 */
+  .tool-badge.done {
+    color: #fff; background: #2fbf71; border-color: #1d7a48;
+    animation: none;
+  }
+
   .composer {
     display: flex; gap: 10px; padding: 14px 16px;
     background: var(--panel-deep); border-top: 3px solid var(--line);
@@ -236,22 +252,31 @@
     row.className = "msg " + role;
     var bubble = document.createElement("div");
     bubble.className = "bubble";
-    if (text) bubble.textContent = text;
+    // 气泡内拆两块：.badges 工具轨迹行（平时为空、整体隐藏）+ .bubble-text 正文
+    // 正文追加只写 .bubble-text，保证不会覆盖徽章
+    var badges = document.createElement("div");
+    badges.className = "badges";
+    var body = document.createElement("span");
+    body.className = "bubble-text";
+    if (text) body.textContent = text;
+    bubble.appendChild(badges);
+    bubble.appendChild(body);
     row.appendChild(bubble);
     messagesEl.appendChild(row);
     scrollBottom();
-    return bubble;
+    return bubble; // 语义保持：仍返回 .bubble 元素
   }
 
   // 打字中指示：一个临时占位气泡，收到首个 delta 后替换为真实气泡
   function showTyping() {
     var bubble = appendBubble("assistant", "");
+    var body = bubble.querySelector(".bubble-text");
     var t = document.createElement("span");
     t.className = "typing";
     t.appendChild(document.createElement("i"));
     t.appendChild(document.createElement("i"));
     t.appendChild(document.createElement("i"));
-    bubble.appendChild(t);
+    body.appendChild(t);
     return bubble;
   }
 
@@ -263,13 +288,51 @@
   }
 
   function appendText(bubble, text) {
-    bubble.textContent += text;
+    // 只追加到 .bubble-text，徽章行不受影响
+    bubble.querySelector(".bubble-text").textContent += text;
     scrollBottom();
   }
 
   function streamError(bubble, message) {
     bubble.classList.add("error");
     appendText(bubble, "⚠️ " + message);
+  }
+
+  // 工具轨迹帧：running → 闪烁徽章亮出；done → 同名徽章落定变绿，summary 挂 title 悬浮可见
+  function handleToolFrame(bubble, tool) {
+    if (!tool || !tool.name) return; // 未知形状静默跳过
+    var badges = bubble.querySelector(".badges");
+    if (!badges) return;
+
+    if (tool.status === "running") {
+      var badge = document.createElement("span");
+      badge.className = "tool-badge running";
+      badge.dataset.toolName = tool.name; // 供 done 帧按名匹配
+      badge.textContent = "⚒ " + tool.name + "…";
+      badges.appendChild(badge);
+      scrollBottom();
+      return;
+    }
+
+    if (tool.status === "done") {
+      var running = badges.querySelectorAll(".tool-badge.running");
+      var target = null;
+      for (var k = 0; k < running.length; k++) {
+        if (running[k].dataset.toolName === tool.name) { target = running[k]; break; }
+      }
+      if (!target) {
+        // 兜底：没等到 running 帧也保证 done 徽章可见
+        target = document.createElement("span");
+        target.className = "tool-badge running";
+        target.dataset.toolName = tool.name;
+        badges.appendChild(target);
+      }
+      target.classList.remove("running");
+      target.classList.add("done");
+      target.textContent = "✓ " + tool.name;
+      if (tool.summary) target.title = tool.summary;
+      scrollBottom();
+    }
   }
 
   async function send() {
@@ -321,9 +384,14 @@
               streamError(bubble, payload.error.message || "服务暂时不可用");
               continue;
             }
+            if (payload.tool) { // 工具轨迹帧：running/done
+              handleToolFrame(bubble, payload.tool);
+              continue;
+            }
             var delta = payload.choices && payload.choices[0] && payload.choices[0].delta;
             if (delta && delta.content) {
-              if (!gotFirst) { bubble.textContent = ""; gotFirst = true; }
+              var body = bubble.querySelector(".bubble-text");
+              if (!gotFirst) { body.textContent = ""; gotFirst = true; } // 清掉打字指示，只动正文
               appendText(bubble, delta.content);
             }
           }
@@ -336,7 +404,7 @@
         appendText(bubble, "（空回复）");
       }
     } catch (err) {
-      if (!gotFirst) bubble.textContent = "";
+      if (!gotFirst) bubble.querySelector(".bubble-text").textContent = ""; // 只清正文，保留已有徽章
       streamError(bubble, "连接失败：" + (err && err.message ? err.message : "未知错误"));
     } finally {
       setStreaming(false);
