@@ -22,19 +22,25 @@ from pydantic import BaseModel, Field
 class QueryOrderInput(BaseModel):
     """query_order 工具入参。"""
 
-    order_id: str = Field(description="订单号,如 ORD-20260927-001")
+    order_id: str = Field(
+        description="订单号,原样传入用户提供的编号即可,无需校验格式,如 1001、ORD-20260927-001"
+    )
 
 
 class QueryProductInput(BaseModel):
     """query_product 工具入参。"""
 
-    product_id: str = Field(description="商品 ID,如 P-1001")
+    product_id: str = Field(
+        description="商品 ID,原样传入用户提供的编号即可,无需校验格式,如 1001、P-1001"
+    )
 
 
 class QueryLogisticsInput(BaseModel):
     """query_logistics 工具入参。"""
 
-    order_id: str = Field(description="订单号,用于查询该订单的物流轨迹")
+    order_id: str = Field(
+        description="订单号,原样传入用户提供的编号即可,无需校验格式,如 1001、ORD-20260927-001"
+    )
 
 
 # ---------------------------------------------------------------------------
