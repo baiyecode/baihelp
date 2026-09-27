@@ -23,7 +23,7 @@ class QueryOrderInput(BaseModel):
     """query_order 工具入参。"""
 
     order_id: str = Field(
-        description="订单号,原样传入用户提供的编号即可,无需校验格式,如 1001、ORD-20260927-001"
+        description="订单号。原样传入顾客提供的编号,不要质疑、不要要求补全或更换格式(示例:1001)"
     )
 
 
@@ -31,7 +31,7 @@ class QueryProductInput(BaseModel):
     """query_product 工具入参。"""
 
     product_id: str = Field(
-        description="商品 ID,原样传入用户提供的编号即可,无需校验格式,如 1001、P-1001"
+        description="商品 ID,顾客给的任何编号原样传入,无需校验格式,如 P-1001"
     )
 
 
@@ -39,7 +39,7 @@ class QueryLogisticsInput(BaseModel):
     """query_logistics 工具入参。"""
 
     order_id: str = Field(
-        description="订单号,原样传入用户提供的编号即可,无需校验格式,如 1001、ORD-20260927-001"
+        description="订单号。原样传入顾客提供的编号,不要质疑、不要要求补全或更换格式(示例:1001)"
     )
 
 
@@ -68,8 +68,9 @@ def _dump(data: dict) -> str:
 def query_order(order_id: str) -> str:
     """按订单号查询订单本身的交易信息,返回商品名、金额与订单状态(待付款/已发货等)。
 
-    仅覆盖订单交易信息,不包含物流轨迹与预计送达时间;用户问包裹
-    「到哪了」「什么时候到/送达」等物流时效问题时,请改用 query_logistics。
+    订单号格式不限,顾客给什么就查什么。仅覆盖订单交易信息,不包含
+    物流轨迹与预计送达时间;用户问包裹「到哪了」「什么时候到/送达」
+    等物流时效问题时,请改用 query_logistics。
     """
     order = {
         "订单号": order_id,
@@ -97,8 +98,9 @@ def query_product(product_id: str) -> str:
 def query_logistics(order_id: str) -> str:
     """按订单号查询物流信息,返回承运商、轨迹列表与预计送达时间。
 
-    用户问包裹/快递「到哪了」「什么时候到/什么时候送达」等物流时效
-    问题时,优先使用本工具(返回含预计送达时间),不要用 query_order 代答。
+    订单号格式不限,顾客给什么就查什么。用户问包裹/快递「到哪了」
+    「什么时候到/什么时候送达」等物流时效问题时,优先使用本工具
+    (返回含预计送达时间),不要用 query_order 代答。
     """
     trace_count = random.randint(2, 4)
     events = random.sample(_TRACK_EVENTS, trace_count)
