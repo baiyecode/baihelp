@@ -135,8 +135,8 @@ mock 工具用 `random` 但接口形态固定(演示);种子 faq 8 条含「退�
 `stream_chat_reply` 增参:registry、persistence(写穿门面,包 session_factory)。流程见 §6。内存 store 语义不变:成功才追加;工具轮追加 [Human, AIMessage(tool_calls), ToolMessage…, AIMessage(最终)]。
 
 ### 7.6 端点接缝(app/api/chat.py + main.py)
-- 模块级 `get_session_factory()` 新接缝(monkeypatch 注入 SQLite 工厂),与 get_model/get_settings 同型
-- `app.state.tool_registry` 于 create_app 组装(注册五工具)
+- 模块级 `get_session_factory(request)` 新接缝(monkeypatch 注入 SQLite 工厂):收 `request` 参、返回 `request.app.state.session_factory`——与 get_model 的模块级 monkeypatch 惯例同型,但工厂本体由 lifespan 预建并挂 app.state,保证 ping 探活的 engine 与端点实际使用的 engine 是同一台,且不随请求重建连接池(评审裁定,替代初稿「无参同型」写法)
+- `app.state.tool_registry` 与 session_factory 一并于 **lifespan** 组装(注册五工具)——create_app 在模块导入期执行,放那里会要求导入期即具备真实配置,破坏测试导入
 - lifespan:engine 预建 + `SELECT 1` ping,fail-fast 提示「先 docker compose up -d 并执行建表 DDL」;关停 dispose。**不跑 create_all**(MySQL 端建表唯一依据是用户 DDL)
 
 ### 7.7 聊天页(Vibe Coding,预期效果)
