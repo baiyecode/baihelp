@@ -23,6 +23,30 @@ def format_error_event(message: str) -> str:
     return f"data: {payload}\n\n"
 
 
+def format_tool_event(
+    name: str,
+    status: str,
+    args: dict | None = None,
+    summary: str | None = None,
+) -> str:
+    """把工具调用状态格式化为流内 tool 事件（running/done）。
+
+    ``args``/``summary`` 仅在非 None 时拼入帧体，键序固定为
+    name → status → args → summary。
+    """
+    tool: dict = {"name": name, "status": status}
+    if args is not None:
+        tool["args"] = args
+    if summary is not None:
+        tool["summary"] = summary
+    payload = json.dumps(
+        {"tool": tool},
+        ensure_ascii=False,
+        separators=(",", ":"),  # 紧凑风格，与 format_delta_chunk 一致
+    )
+    return f"data: {payload}\n\n"
+
+
 def format_done() -> str:
     """返回 SSE 流的结束标记。"""
     return "data: [DONE]\n\n"
