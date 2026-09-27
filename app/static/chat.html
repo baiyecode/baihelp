@@ -141,13 +141,12 @@
   .tool-badge {
     display: inline-block; font-size: 12px; line-height: 1;
     padding: 4px 8px; cursor: default;
-    background: var(--panel-deep); color: var(--blue);
-    border: 2px solid var(--line);
-    box-shadow: 2px 2px 0 rgba(39, 75, 159, .18);
+    color: var(--blue); background: transparent;
+    border: 2px dashed var(--muted);
   }
   .tool-badge.running { animation: blink 1s steps(2) infinite; } /* 复用现有像素闪烁 */
   .tool-badge.done {
-    color: #fff; background: #2fbf71; border-color: #1d7a48;
+    color: var(--text); border-color: var(--line-soft);
     animation: none;
   }
 
@@ -308,7 +307,7 @@
       var badge = document.createElement("span");
       badge.className = "tool-badge running";
       badge.dataset.toolName = tool.name; // 供 done 帧按名匹配
-      badge.textContent = "⚒ " + tool.name + "…";
+      badge.textContent = "🔧 " + tool.name + "…";
       badges.appendChild(badge);
       scrollBottom();
       return;
@@ -329,7 +328,7 @@
       }
       target.classList.remove("running");
       target.classList.add("done");
-      target.textContent = "✓ " + tool.name;
+      target.textContent = "🔧 " + tool.name;
       if (tool.summary) target.title = tool.summary;
       scrollBottom();
     }
