@@ -8,7 +8,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "bash \"J:/code/Mewhelp/.zcode/hooks/session-start\"",
+              "command": "bash \"J:/code/baihelp/.zcode/hooks/session-start\"",
               "shell": "bash",
               "timeout": 10
             }
