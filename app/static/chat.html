@@ -102,6 +102,10 @@
     position: relative;
   }
   .welcome .ok { color: var(--blue); }
+  .cat-mini {
+    display: inline-block; width: 20px; height: 20px;
+    vertical-align: -4px; shape-rendering: crispEdges;
+  }
   .welcome::after {
     content: "▼"; position: absolute; right: 12px; bottom: 4px;
     color: var(--blue); font-size: 14px;
@@ -155,34 +159,40 @@
 </style>
 </head>
 <body>
+<!-- 全站唯一的像素猫定义：头像与欢迎语都引用 #pixel-cat，保证完全一致 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="pixel-cat" viewBox="0 0 12 12" shape-rendering="crispEdges">
+      <rect x="1" y="2" width="10" height="9" fill="#5a8dff"/>
+      <rect x="3" y="2" width="6" height="1" fill="#274b9f"/>
+      <rect x="1" y="10" width="10" height="1" fill="#274b9f"/>
+      <rect x="1" y="3" width="1" height="7" fill="#274b9f"/>
+      <rect x="10" y="3" width="1" height="7" fill="#274b9f"/>
+      <rect x="1" y="0" width="2" height="2" fill="#5a8dff"/>
+      <rect x="9" y="0" width="2" height="2" fill="#5a8dff"/>
+      <rect x="2" y="1" width="1" height="1" fill="#ff9db8"/>
+      <rect x="9" y="1" width="1" height="1" fill="#ff9db8"/>
+      <rect x="5" y="3" width="2" height="1" fill="#3f6fd8"/>
+      <rect x="3" y="5" width="2" height="2" fill="#1c2f66"/>
+      <rect x="7" y="5" width="2" height="2" fill="#1c2f66"/>
+      <rect x="5" y="7" width="2" height="1" fill="#ff9db8"/>
+      <rect x="5" y="8" width="2" height="1" fill="#274b9f"/>
+      <rect x="2" y="7" width="1" height="1" fill="#ffb8c9"/>
+      <rect x="9" y="7" width="1" height="1" fill="#ffb8c9"/>
+      <rect x="0" y="5" width="1" height="1" fill="#7da4ff"/>
+      <rect x="0" y="7" width="1" height="1" fill="#7da4ff"/>
+      <rect x="11" y="5" width="1" height="1" fill="#7da4ff"/>
+      <rect x="11" y="7" width="1" height="1" fill="#7da4ff"/>
+    </symbol>
+  </defs>
+</svg>
 <div class="cloud c1"></div>
 <div class="cloud c2"></div>
 <div class="cloud c3"></div>
 <div class="chat-shell">
   <header class="chat-header">
     <div class="brand">
-      <svg class="brand-avatar" viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true">
-        <rect x="1" y="2" width="10" height="9" fill="#5a8dff"/>
-        <rect x="3" y="2" width="6" height="1" fill="#274b9f"/>
-        <rect x="1" y="10" width="10" height="1" fill="#274b9f"/>
-        <rect x="1" y="3" width="1" height="7" fill="#274b9f"/>
-        <rect x="10" y="3" width="1" height="7" fill="#274b9f"/>
-        <rect x="1" y="0" width="2" height="2" fill="#5a8dff"/>
-        <rect x="9" y="0" width="2" height="2" fill="#5a8dff"/>
-        <rect x="2" y="1" width="1" height="1" fill="#ff9db8"/>
-        <rect x="9" y="1" width="1" height="1" fill="#ff9db8"/>
-        <rect x="5" y="3" width="2" height="1" fill="#3f6fd8"/>
-        <rect x="3" y="5" width="2" height="2" fill="#1c2f66"/>
-        <rect x="7" y="5" width="2" height="2" fill="#1c2f66"/>
-        <rect x="5" y="7" width="2" height="1" fill="#ff9db8"/>
-        <rect x="5" y="8" width="2" height="1" fill="#274b9f"/>
-        <rect x="2" y="7" width="1" height="1" fill="#ffb8c9"/>
-        <rect x="9" y="7" width="1" height="1" fill="#ffb8c9"/>
-        <rect x="0" y="5" width="1" height="1" fill="#7da4ff"/>
-        <rect x="0" y="7" width="1" height="1" fill="#7da4ff"/>
-        <rect x="11" y="5" width="1" height="1" fill="#7da4ff"/>
-        <rect x="11" y="7" width="1" height="1" fill="#7da4ff"/>
-      </svg>
+      <svg class="brand-avatar" aria-hidden="true"><use href="#pixel-cat"/></svg>
       <div>
         <div class="brand-name">本店 · 智能客服</div>
         <div class="brand-status"><span class="dot"></span>在线 · 回复为 AI 生成</div>
@@ -192,7 +202,7 @@
   </header>
   <main id="messages" class="messages">
     <div class="welcome">
-      <span class="ok">你好！我是本店智能客服 🐱</span><br>
+      <span class="ok">你好！我是本店智能客服</span> <svg class="cat-mini" aria-hidden="true"><use href="#pixel-cat"/></svg><br>
       订单查询、退货退款、物流售后的问题都可以问我。<br>
       点击下方输入框开始对话吧！
     </div>
@@ -344,7 +354,7 @@
     messagesEl.innerHTML = "";
     var welcome = document.createElement("div");
     welcome.className = "welcome";
-    welcome.innerHTML = '<span class="ok">已开启新会话 🌿</span><br>关于订单、售后、物流的问题都可以问我～';
+    welcome.innerHTML = '<span class="ok">已开启新会话</span> <svg class="cat-mini"><use href="#pixel-cat"/></svg><br>关于订单、售后、物流的问题都可以问我～';
     messagesEl.appendChild(welcome);
     inputEl.focus();
   });
