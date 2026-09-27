@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 import pytest_asyncio
+from fastapi import FastAPI, Request
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -88,7 +89,7 @@ async def client(
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         factory: async_sessionmaker[AsyncSession] = build_session_factory(engine)
-        monkeypatch.setattr(chat_api, "get_session_factory", lambda: factory)
+        monkeypatch.setattr(chat_api, "get_session_factory", lambda request: factory)
         app.state.store = SessionStore()
         app.state.tool_registry = build_default_registry(
             Settings(_env_file=None, llm_api_key="sk-test")
@@ -191,3 +192,13 @@ async def test_endpoint_binds_registry_tools(
     assert [tool.name for tool in fake.bound_tools[0]] == [
         tool.name for tool in get_all_tools()
     ]
+
+
+def test_endpoint_persistence_uses_app_state_factory() -> None:
+    """端点写穿用的是 lifespan 预建那台工厂：get_session_factory(request) 原样返回 app.state.session_factory。"""
+    # 用一次性 FastAPI 实例当 scope["app"],不触碰共享模块级 app 的 state
+    fresh_app = FastAPI()
+    fresh_app.state.session_factory = object()  # 哨兵:只验身份,不需要真工厂
+    request = Request({"type": "http", "app": fresh_app})
+
+    assert chat_api.get_session_factory(request) is fresh_app.state.session_factory

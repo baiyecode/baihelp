@@ -165,18 +165,6 @@ async def test_ping_raises_runtime_error_with_compose_hint_when_unreachable() ->
         await engine.dispose()
 
 
-@pytest.mark.asyncio
-async def test_engine_ping_failure_message() -> None:
-    """(task-10 启动契约)对坏 DSN 的 engine 调 ping → RuntimeError 消息含「docker compose」。"""
-    # 127.0.0.1:1 无服务监听,连接必被拒绝(离线确定性)
-    engine = build_engine("mysql+aiomysql://baihelp:baihelp@127.0.0.1:1/baihelp")
-    try:
-        with pytest.raises(RuntimeError, match="docker compose"):
-            await ping(engine)
-    finally:
-        await engine.dispose()
-
-
 def test_session_factory_disables_expire_on_commit() -> None:
     """会话工厂必须 expire_on_commit=False(提交后属性仍可读,配合写穿门面)。"""
     engine = build_engine("sqlite+aiosqlite://")

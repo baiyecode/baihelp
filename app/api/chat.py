@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
-from app.db.engine import build_engine, build_session_factory
 from app.llm.factory import get_chat_model
 from app.services.chat import stream_chat_reply
 from app.services.history import HistoryTrimmer
@@ -28,9 +27,13 @@ def get_model() -> BaseChatModel:
     return get_chat_model(get_settings())
 
 
-def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    """构造真实会话工厂；测试经 monkeypatch 本函数注入 SQLite 内存工厂（DI 缝隙）。"""
-    return build_session_factory(build_engine(get_settings().database_url))
+def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
+    """取 lifespan 预建在 app.state 上的会话工厂；测试经 monkeypatch 本函数注入 SQLite 内存工厂（DI 缝隙）。
+
+    收 request 参读 ``request.app.state.session_factory``：端点写穿用的就是
+    lifespan 建引擎（ping 探活那台）预建的工厂，不重复建引擎/连接池。
+    """
+    return request.app.state.session_factory
 
 
 @router.post("/stream")
@@ -38,7 +41,8 @@ async def chat_stream(body: ChatStreamRequest, request: Request) -> EventSourceR
     """流式回复：历史预算裁剪 → 模型流式生成（可含工具轮）→ SSE 事件逐字节下发。
 
     registry 取自 lifespan 组装的 app.state.tool_registry（绑定五工具 + 超时重试）；
-    persistence 走 get_session_factory 接缝组装写穿门面（会话建档 + 消息逐行落库）。
+    persistence 经 get_session_factory(request) 取 lifespan 预建的会话工厂组装
+    写穿门面（会话建档 + 消息逐行落库）。
     """
     model = get_model()
     # 模型计数器面向 str（BaseLanguageModel.get_num_tokens），裁剪器面向
@@ -55,7 +59,7 @@ async def chat_stream(body: ChatStreamRequest, request: Request) -> EventSourceR
         body.session_id,
         body.message,
         registry=request.app.state.tool_registry,
-        persistence=ChatPersistence(get_session_factory()),
+        persistence=ChatPersistence(get_session_factory(request)),
     )
     # 直接返回 EventSourceResponse，把生成器的预格式化 SSE 串原样下发。
     # 不能挂 response_class=EventSourceResponse 走 producer 模式——那会把
