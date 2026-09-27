@@ -1,4 +1,4 @@
-# Mewhelp — 电商智能客服系统
+# Baihelp — 电商智能客服系统
 
 基于 Superpowers 开发方法论逐章构建的电商智能客服系统。当前完成 **Ch01 · 纯对话**：多轮对话、SSE 流式输出、Prompt 模板化、售后信息结构化抽取。
 
@@ -17,8 +17,8 @@
 
 ```bash
 # 1. 克隆并安装（需要 uv）
-git clone https://github.com/baiyecode/mewhelp.git
-cd mewhelp
+git clone https://github.com/baiyecode/baihelp.git
+cd baihelp
 uv sync
 
 # 2. 配置模型供应商

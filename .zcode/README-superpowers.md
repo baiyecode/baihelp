@@ -1,6 +1,6 @@
 # superpowers（本项目局部安装）
 
-本目录包含 [obra/superpowers](https://github.com/obra/superpowers) **v6.4.2**（2026-09-25 发布，MIT 许可证）的工作区级安装，**只对 Mewhelp 这个项目生效**。
+本目录包含 [obra/superpowers](https://github.com/obra/superpowers) **v6.4.2**（2026-09-25 发布，MIT 许可证）的工作区级安装，**只对 Baihelp 这个项目生效**。
 
 ## 为什么不通过插件市场安装
 

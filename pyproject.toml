@@ -1,5 +1,5 @@
 [project]
-name = "mewhelp"
+name = "baihelp"
 version = "0.1.0"
 description = "E-commerce customer-service chat backend"
 authors = [

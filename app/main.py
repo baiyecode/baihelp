@@ -24,7 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """装配应用：共享会话存储与 system 模板挂在 app.state，注册路由。"""
-    app = FastAPI(title="Mewhelp 客服后端", lifespan=lifespan)
+    app = FastAPI(title="Baihelp 客服后端", lifespan=lifespan)
     app.state.store = SessionStore()
     app.state.system_template = load_system_prompt()
     app.include_router(chat_router)

@@ -37,7 +37,7 @@
 分层单体，目录结构：
 
 ```
-Mewhelp/
+Baihelp/
 ├── app/
 │   ├── api/            # 路由：chat.py（SSE）、extract.py、healthz；sse.py（delta 格式化器）
 │   ├── core/           # config.py（pydantic-settings 读 .env）
