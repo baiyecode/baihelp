@@ -37,3 +37,18 @@ def test_defaults_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.llm_model == "deepseek-chat"
     assert settings.history_token_budget == 3000
     assert settings.request_timeout == 60
+
+
+def test_database_settings_defaults() -> None:
+    """默认连接串指向 Docker MySQL 的 baihelp 库,超时/重试为章节数值。"""
+    settings = Settings(_env_file=None, llm_api_key="sk-test")
+    assert settings.database_url == (
+        "mysql+aiomysql://baihelp:baihelp@127.0.0.1:3306/baihelp?charset=utf8mb4"
+    )
+    assert settings.tool_timeout_seconds == 10.0
+    assert settings.tool_max_retries == 1
+
+def test_database_url_env_override() -> None:
+    """环境变量可覆盖连接串(测试换 SQLite 用同一开关)。"""
+    settings = Settings(_env_file=None, llm_api_key="sk-test", database_url="sqlite+aiosqlite://")
+    assert settings.database_url == "sqlite+aiosqlite://"

@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     llm_api_key: str
     history_token_budget: int = 3000
     request_timeout: int = 60
+    database_url: str = (
+        "mysql+aiomysql://baihelp:baihelp@127.0.0.1:3306/baihelp?charset=utf8mb4"
+    )
+    tool_timeout_seconds: float = 10.0
+    tool_max_retries: int = 1
 
     model_config = SettingsConfigDict(env_file=".env")
 
