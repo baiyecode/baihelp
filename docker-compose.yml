@@ -1,0 +1,31 @@
+# ch02 · Function Calling 数据层编排
+# MySQL 8.4 实例:库 baihelp / 用户 baihelp / 密码 baihelp / 端口 3306
+# 首次启动时把 scripts/sql/ 下的 DDL 挂进 /docker-entrypoint-initdb.d 自动建表
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: baihelp-mysql
+    environment:
+      MYSQL_DATABASE: baihelp
+      MYSQL_USER: baihelp
+      MYSQL_PASSWORD: baihelp
+      MYSQL_ROOT_PASSWORD: baihelp-root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 只读挂载:initdb 首次建表用,文件与仓库内保持逐字节一致
+      - ./scripts/sql:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      # 间隔 5s,必须等 healthy 才算库就绪
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pbaihelp-root"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
