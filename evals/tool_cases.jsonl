@@ -1,0 +1,19 @@
+{"id": "order-01", "query": "订单 3003 付款了吗", "expected_tool": "query_order"}
+{"id": "order-02", "query": "我订单 2002 现在什么状态", "expected_tool": "query_order"}
+{"id": "order-03", "query": "查一下订单 1001", "expected_tool": "query_order"}
+{"id": "order-04", "query": "帮我看看订单 5005 用什么方式付的款", "expected_tool": "query_order"}
+{"id": "product-01", "query": "商品 P-1001 现在卖多少钱", "expected_tool": "query_product"}
+{"id": "product-02", "query": "帮我看看 P-2002 还有货吗", "expected_tool": "query_product"}
+{"id": "product-03", "query": "P-3003 这个商品评分怎么样", "expected_tool": "query_product"}
+{"id": "logistics-01", "query": "订单 1001 的物流到哪了", "expected_tool": "query_logistics"}
+{"id": "logistics-02", "query": "订单 2002 的快递是哪家在送", "expected_tool": "query_logistics"}
+{"id": "logistics-03", "query": "查一下订单 3003 的包裹什么时候能到", "expected_tool": "query_logistics"}
+{"id": "logistics-04", "query": "订单 5005 发货了没有", "expected_tool": "query_logistics"}
+{"id": "faq-01", "query": "退货政策是什么", "expected_tool": "query_faq"}
+{"id": "faq-02", "query": "怎么开发票", "expected_tool": "query_faq"}
+{"id": "faq-03", "query": "支持哪些支付方式", "expected_tool": "query_faq"}
+{"id": "ticket-01", "query": "再不处理我就投诉了,给我转人工", "expected_tool": "create_ticket"}
+{"id": "ticket-02", "query": "商品摔坏了必须退货", "expected_tool": "create_ticket"}
+{"id": "none-01", "query": "你好,在吗", "expected_tool": "none"}
+{"id": "none-02", "query": "谢谢", "expected_tool": "none"}
+{"id": "faq-postage-miss", "query": "邮费是多少", "expected_tool": "query_faq", "note": "漏召回记录样例:选型门禁要求模型应选中 query_faq,但 FAQ 种子 question 刻意不含「邮费/运费」,下游 LIKE 检索落空,属预期漏召回,完整回答由兜底话术生成"}
