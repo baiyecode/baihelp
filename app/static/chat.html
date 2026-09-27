@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本店 · 智能客服</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #e8eefc 0%, #f4f6fb 55%, #eef7f2 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .chat-shell {
+    width: min(720px, 100%); height: min(86vh, 820px);
+    display: flex; flex-direction: column;
+    background: #fbfcfe; border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31, 51, 96, .16), 0 2px 8px rgba(31, 51, 96, .08);
+    overflow: hidden;
+  }
+  .chat-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; background: #fff;
+    border-bottom: 1px solid #eef1f6;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-avatar {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(135deg, #4f7cff, #38b2a3);
+    color: #fff; font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-name { font-size: 16px; font-weight: 700; color: #1f2b48; }
+  .brand-status { font-size: 12px; color: #8a93a6; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #2fbf71; box-shadow: 0 0 0 3px rgba(47, 191, 113, .15); }
+  .new-chat {
+    border: 1px solid #dfe5ef; background: #fff;
+    color: #4a5678; font-size: 13px; padding: 7px 14px; border-radius: 10px; cursor: pointer;
+    transition: background .15s;
+  }
+  .new-chat:hover { background: #f1f4fa; }
+  .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .welcome {
+    margin: auto; text-align: center; color: #9aa3b5; font-size: 14px; line-height: 1.9;
+  }
+  .msg { display: flex; }
+  .msg.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 14px;
+    font-size: 14.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .msg.assistant .bubble { background: #fff; color: #26304a; border: 1px solid #e8ecf3; border-top-left-radius: 4px; }
+  .msg.user .bubble { background: linear-gradient(135deg, #4f7cff, #3f66e0); color: #fff; border-top-right-radius: 4px; }
+  .bubble.error { background: #fdf1f1; border-color: #f3c6c6; color: #b42318; }
+  .typing { display: inline-flex; gap: 5px; padding: 4px 2px; }
+  .typing i {
+    width: 6px; height: 6px; border-radius: 50%; background: #aab4c8;
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .typing i:nth-child(2) { animation-delay: .18s; }
+  .typing i:nth-child(3) { animation-delay: .36s; }
+  @keyframes blink { 0%, 70%, 100% { opacity: .3; transform: none; } 35% { opacity: 1; transform: translateY(-3px); } }
+  .composer {
+    display: flex; gap: 10px; padding: 14px 16px; background: #fff;
+    border-top: 1px solid #eef1f6;
+  }
+  .composer input {
+    flex: 1; border: 1px solid #dfe5ef; border-radius: 12px;
+    padding: 11px 14px; font-size: 14.5px; outline: none; color: #26304a;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer input:focus { border-color: #4f7cff; box-shadow: 0 0 0 3px rgba(79, 124, 255, .12); }
+  .composer input:disabled { background: #f4f6fa; color: #9aa3b5; }
+  .composer button {
+    border: none; border-radius: 12px; padding: 0 20px;
+    background: linear-gradient(135deg, #4f7cff, #3f66e0); color: #fff;
+    font-size: 14.5px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  }
+  .composer button:disabled { opacity: .45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="chat-shell">
+  <header class="chat-header">
+    <div class="brand">
+      <span class="brand-avatar">店</span>
+      <div>
+        <div class="brand-name">本店 · 智能客服</div>
+        <div class="brand-status"><span class="dot"></span>在线 · 回复为 AI 生成</div>
+      </div>
+    </div>
+    <button id="newChatBtn" class="new-chat" title="开启新会话（清除当前对话窗口）">新会话</button>
+  </header>
+  <main id="messages" class="messages">
+    <div class="welcome">你好，我是本店智能客服 👋<br>订单查询、退货退款、物流售后的问题都可以问我～</div>
+  </main>
+  <footer class="composer">
+    <input id="input" type="text" placeholder="输入你的问题，回车发送…" autocomplete="off" autofocus>
+    <button id="sendBtn">发送</button>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var messagesEl = document.getElementById("messages");
+  var inputEl = document.getElementById("input");
+  var sendBtn = document.getElementById("sendBtn");
+  var newChatBtn = document.getElementById("newChatBtn");
+
+  var state = {
+    sessionId: crypto.randomUUID(),
+    streaming: false,
+  };
+
+  function scrollBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function appendBubble(role, text) {
+    var row = document.createElement("div");
+    row.className = "msg " + role;
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    if (text) bubble.textContent = text;
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollBottom();
+    return bubble;
+  }
+
+  // 打字中指示：一个临时占位气泡，收到首个 delta 后替换为真实气泡
+  function showTyping() {
+    var bubble = appendBubble("assistant", "");
+    var t = document.createElement("span");
+    t.className = "typing";
+    t.appendChild(document.createElement("i"));
+    t.appendChild(document.createElement("i"));
+    t.appendChild(document.createElement("i"));
+    bubble.appendChild(t);
+    return bubble;
+  }
+
+  function setStreaming(on) {
+    state.streaming = on;
+    sendBtn.disabled = on;
+    inputEl.disabled = on;
+    if (!on) inputEl.focus();
+  }
+
+  function appendText(bubble, text) {
+    bubble.textContent += text;
+    scrollBottom();
+  }
+
+  function streamError(bubble, message) {
+    bubble.classList.add("error");
+    appendText(bubble, "⚠️ " + message);
+  }
+
+  async function send() {
+    var text = inputEl.value.trim();
+    if (!text || state.streaming) return;
+
+    var welcome = messagesEl.querySelector(".welcome");
+    if (welcome) welcome.remove();
+
+    appendBubble("user", text);
+    inputEl.value = "";
+    setStreaming(true);
+    var bubble = showTyping();
+    var gotFirst = false;
+
+    try {
+      var resp = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: state.sessionId, message: text }),
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      if (!resp.body) throw new Error("浏览器不支持流式响应");
+
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder("utf-8");
+      var buf = "";
+      var finished = false;
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buf += decoder.decode(chunk.value, { stream: true });
+
+        // SSE 事件以空行分隔；末尾可能是半个事件，留到下一轮
+        var events = buf.split("\n\n");
+        buf = events.pop();
+
+        for (var i = 0; i < events.length; i++) {
+          var lines = events[i].split("\n");
+          for (var j = 0; j < lines.length; j++) {
+            var line = lines[j];
+            if (line.indexOf("data: ") !== 0) continue;
+            var data = line.slice(6);
+            if (data === "[DONE]") { finished = true; continue; }
+            var payload;
+            try { payload = JSON.parse(data); } catch (e) { continue; }
+            if (payload.error) {
+              streamError(bubble, payload.error.message || "服务暂时不可用");
+              continue;
+            }
+            var delta = payload.choices && payload.choices[0] && payload.choices[0].delta;
+            if (delta && delta.content) {
+              if (!gotFirst) { bubble.textContent = ""; gotFirst = true; }
+              appendText(bubble, delta.content);
+            }
+          }
+        }
+      }
+
+      if (!gotFirst && !bubble.classList.contains("error") && !finished) {
+        streamError(bubble, "连接中断，未收到完整回复");
+      } else if (!gotFirst && !bubble.classList.contains("error")) {
+        appendText(bubble, "（空回复）");
+      }
+    } catch (err) {
+      if (!gotFirst) bubble.textContent = "";
+      streamError(bubble, "连接失败：" + (err && err.message ? err.message : "未知错误"));
+    } finally {
+      setStreaming(false);
+    }
+  }
+
+  sendBtn.addEventListener("click", send);
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) send();
+  });
+
+  newChatBtn.addEventListener("click", function () {
+    if (state.streaming) return;
+    state.sessionId = crypto.randomUUID();
+    messagesEl.innerHTML = "";
+    var welcome = document.createElement("div");
+    welcome.className = "welcome";
+    welcome.innerHTML = "已开启新会话 🌿<br>关于订单、售后、物流的问题都可以问我～";
+    messagesEl.appendChild(welcome);
+    inputEl.focus();
+  });
+})();
+</script>
+</body>
+</html>

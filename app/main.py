@@ -2,8 +2,10 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from app.api.chat import router as chat_router
 from app.api.extract import router as extract_router
@@ -36,6 +38,11 @@ def create_app() -> FastAPI:
             "provider": settings.llm_provider,
             "model": settings.llm_model,
         }
+
+    # 聊天页面（Vibe Coding 例外产物）：每请求读文件，改 HTML 无需重启服务。
+    @app.get("/", include_in_schema=False)
+    async def index() -> FileResponse:
+        return FileResponse(Path(__file__).parent / "static" / "chat.html")
 
     return app
 
