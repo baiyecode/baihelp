@@ -36,7 +36,15 @@ async def create_ticket(
     conversation_id: Annotated[int, InjectedToolArg],
     session_factory: Annotated[async_sessionmaker[AsyncSession], InjectedToolArg],
 ) -> str:
-    """为当前会话创建一张人工工单,交由人工客服跟进处理。"""
+    """为当前会话创建一张人工工单,交由人工客服跟进处理。
+
+    用户明确要求转人工/找人工客服、表达投诉,或带情绪地提出具体售后
+    诉求(如「必须退货」「要求退款」「要维修」)时,应直接调用本工具
+    登记工单,而不是仅作口头安抚,也不必先查政策。
+
+    与 query_faq 的边界:「政策/流程是什么」类咨询走 query_faq;
+    「要求处理/登记/转人工」类诉求走本工具。
+    """
     async with session_factory() as session, session.begin():
         ticket = await create_ticket_repo(session, conversation_id, description, ticket_type)
         # 会话内先取标量值,避免会话关闭后读 ORM 属性(MissingGreenlet 陷阱)

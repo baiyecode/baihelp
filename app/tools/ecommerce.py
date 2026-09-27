@@ -66,7 +66,11 @@ def _dump(data: dict) -> str:
 
 @tool(args_schema=QueryOrderInput)
 def query_order(order_id: str) -> str:
-    """按订单号查询订单信息,返回商品名、金额与订单状态。"""
+    """按订单号查询订单本身的交易信息,返回商品名、金额与订单状态(待付款/已发货等)。
+
+    仅覆盖订单交易信息,不包含物流轨迹与预计送达时间;用户问包裹
+    「到哪了」「什么时候到/送达」等物流时效问题时,请改用 query_logistics。
+    """
     order = {
         "订单号": order_id,
         "商品名": random.choice(_PRODUCT_NAMES),
@@ -91,7 +95,11 @@ def query_product(product_id: str) -> str:
 
 @tool(args_schema=QueryLogisticsInput)
 def query_logistics(order_id: str) -> str:
-    """按订单号查询物流信息,返回承运商、轨迹列表与预计送达时间。"""
+    """按订单号查询物流信息,返回承运商、轨迹列表与预计送达时间。
+
+    用户问包裹/快递「到哪了」「什么时候到/什么时候送达」等物流时效
+    问题时,优先使用本工具(返回含预计送达时间),不要用 query_order 代答。
+    """
     trace_count = random.randint(2, 4)
     events = random.sample(_TRACK_EVENTS, trace_count)
     events.sort(key=_TRACK_EVENTS.index)  # 按真实时序还原
