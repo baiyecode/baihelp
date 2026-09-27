@@ -32,5 +32,8 @@ def test_defaults_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_settings_env(monkeypatch)
     monkeypatch.setenv("LLM_API_KEY", "test-api-key")
     settings = Settings(_env_file=None)
+    assert settings.llm_provider == "deepseek"
+    assert settings.llm_base_url == "https://api.deepseek.com/v1"
+    assert settings.llm_model == "deepseek-chat"
     assert settings.history_token_budget == 3000
     assert settings.request_timeout == 60
