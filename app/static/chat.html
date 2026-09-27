@@ -286,9 +286,24 @@
     if (!on) inputEl.focus();
   }
 
+  // 极简 markdown 渲染：模型输出按不可信文本处理，先整体 HTML 转义（防 XSS），
+  // 再做安全的 **加粗** 替换。** 会被 token 边界拆进不同增量，所以逐 delta 累积
+  // 原文（bubble.dataset.raw）重渲染整个正文，闭合后自动配对成粗体。
+  function renderBody(bubble) {
+    var body = bubble.querySelector(".bubble-text");
+    var raw = bubble.dataset.raw || "";
+    var safe = raw
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    body.innerHTML = safe;
+  }
+
   function appendText(bubble, text) {
-    // 只追加到 .bubble-text，徽章行不受影响
-    bubble.querySelector(".bubble-text").textContent += text;
+    // 只累积/重渲染 .bubble-text，徽章行不受影响
+    bubble.dataset.raw = (bubble.dataset.raw || "") + text;
+    renderBody(bubble);
     scrollBottom();
   }
 
