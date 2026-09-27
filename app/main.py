@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.chat import router as chat_router
+from app.api.extract import router as extract_router
 from app.core.config import get_settings
 from app.prompts.loader import load_system_prompt
 from app.services.history import SessionStore
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.state.store = SessionStore()
     app.state.system_template = load_system_prompt()
     app.include_router(chat_router)
+    app.include_router(extract_router)
 
     @app.get("/api/healthz")
     async def healthz() -> dict[str, str]:
