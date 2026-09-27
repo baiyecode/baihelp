@@ -1,5 +1,7 @@
 """售后结构化抽取端点。"""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel
@@ -8,6 +10,8 @@ from app.core.config import get_settings
 from app.llm.factory import get_chat_model
 from app.schemas.extraction import AfterSalesExtraction
 from app.services.extraction import extract_after_sales
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/extract", tags=["extract"])
 
@@ -30,4 +34,5 @@ async def extract(body: ExtractRequest) -> AfterSalesExtraction:
     try:
         return await extract_after_sales(model, body.text)
     except Exception as exc:
+        logger.exception("抽取链执行失败")
         raise HTTPException(status_code=502, detail=str(exc)) from exc

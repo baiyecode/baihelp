@@ -5,7 +5,7 @@
 
 ```bash
 uv run uvicorn app.main:app --port 8000
-# 用下面的用户消息逐条请求 POST /api/chat（或经 SSE 客户端），把完整回复贴到"审查结论"栏，
+# 用下面的用户消息逐条请求 POST /api/chat/stream（或经 SSE 客户端），把完整回复贴到"审查结论"栏，
 # 由人工对照清单逐项勾选后记录结论到 dev-notes。
 ```
 
