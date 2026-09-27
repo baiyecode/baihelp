@@ -6,6 +6,11 @@
 -- 建表顺序:先 conversations,再依赖它的 messages / tickets
 -- =============================================================
 
+-- 本文件为 UTF-8 编码;首条语句固定连接字符集,防止客户端按 latin1
+-- 读入导致中文枚举值(进行中/已转人工/已结束/售后/投诉/咨询/待处理/已处理)
+-- 被双重编码、ENUM 成员永久错位(MySQL 8 容器默认 LANG=C 时必踩)
+SET NAMES utf8mb4;
+
 -- 会话壳:一通对话的统一身份,messages / tickets 都引用它
 CREATE TABLE conversations (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '会话主键',
