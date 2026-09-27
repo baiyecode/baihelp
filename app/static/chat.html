@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>本店 · 智能客服 [PIXEL]</title>
+<title>本店 · 智能客服</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/fusion-pixel-12px-proportional-sc/400.css">
 <style>
   :root {
-    --bg: #0a1030;
-    --panel: #141d4d;
-    --panel-deep: #0d1440;
-    --line: #060a20;
-    --blue: #4d7cff;
-    --blue-hi: #5d8aff;
-    --cyan: #55e6ff;
-    --text: #dfe9ff;
-    --muted: #8091cc;
-    --shadow: 4px 4px 0 rgba(3, 6, 24, .55);
+    --bg: #dceafc;
+    --panel: #f6faff;
+    --panel-deep: #eaf3ff;
+    --line: #274b9f;
+    --line-soft: #b9d2f5;
+    --blue: #3f7bff;
+    --blue-hi: #5a8dff;
+    --text: #1c2f66;
+    --muted: #6d84c4;
+    --shadow: 4px 4px 0 rgba(39, 75, 159, .18);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
@@ -29,33 +29,29 @@
     padding: 18px;
     overflow: hidden;
   }
-  /* 像素网格星空底 */
+  /* 浅蓝像素网格 */
   body::before {
     content: ""; position: fixed; inset: 0; z-index: 0;
     background:
-      repeating-linear-gradient(0deg, rgba(77, 124, 255, .07) 0 1px, transparent 1px 22px),
-      repeating-linear-gradient(90deg, rgba(77, 124, 255, .07) 0 1px, transparent 1px 22px);
+      repeating-linear-gradient(0deg, rgba(63, 123, 255, .08) 0 1px, transparent 1px 22px),
+      repeating-linear-gradient(90deg, rgba(63, 123, 255, .08) 0 1px, transparent 1px 22px);
   }
-  /* CRT 扫描线 */
-  body::after {
-    content: ""; position: fixed; inset: 0; z-index: 60; pointer-events: none;
-    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .16) 0 1px, transparent 1px 3px);
+  /* 像素云朵：三个方块拼一团，缓慢横飘 */
+  .cloud {
+    position: fixed; z-index: 0; width: 96px; height: 16px;
+    background: #ffffff; border: 3px solid var(--line-soft);
   }
-  /* 像素星星（两簇，方格闪烁） */
-  .stars, .stars i { position: fixed; width: 3px; height: 3px; }
-  .stars { z-index: 0; }
-  .stars i { background: transparent; }
-  .stars i:nth-child(1) {
-    box-shadow: 8vw 12vh var(--cyan), 22vw 6vh #9db8ff, 38vw 18vh var(--cyan), 55vw 9vh #fff,
-      71vw 15vh #9db8ff, 88vw 22vh var(--cyan), 15vw 30vh #fff, 92vw 38vh #9db8ff, 5vw 46vh var(--cyan);
-    animation: twinkle 1.6s steps(2) infinite;
+  .cloud::before, .cloud::after {
+    content: ""; position: absolute; background: #ffffff; border: 3px solid var(--line-soft);
   }
-  .stars i:nth-child(2) {
-    box-shadow: 30vw 26vh #fff, 47vw 33vh var(--cyan), 63vw 27vh #fff, 79vw 44vh var(--cyan),
-      11vw 52vh #9db8ff, 95vw 58vh var(--cyan), 40vw 47vh #9db8ff, 68vw 51vh #fff;
-    animation: twinkle 1.6s steps(2) .8s infinite;
+  .cloud::before { width: 34px; height: 16px; left: 14px; top: -19px; }
+  .cloud::after { width: 20px; height: 16px; left: 30px; top: -35px; }
+  .cloud.c1 { top: 12%; left: -140px; animation: drift 70s linear infinite; }
+  .cloud.c2 { top: 24%; left: -260px; transform: scale(.72); animation: drift 95s linear 18s infinite; }
+  .cloud.c3 { top: 64%; left: -200px; transform: scale(.55); animation: drift 120s linear 40s infinite; }
+  @keyframes drift {
+    from { left: -180px; } to { left: 105%; }
   }
-  @keyframes twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
   .chat-shell {
     position: relative; z-index: 1;
@@ -63,8 +59,7 @@
     display: flex; flex-direction: column;
     background: var(--panel);
     border: 3px solid var(--line);
-    box-shadow: 8px 8px 0 rgba(3, 6, 24, .6);
-    image-rendering: pixelated;
+    box-shadow: 8px 8px 0 rgba(39, 75, 159, .22);
   }
   .chat-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -73,7 +68,7 @@
   }
   .brand { display: flex; align-items: center; gap: 12px; }
   .brand-avatar { display: block; width: 42px; height: 42px; }
-  .brand-name { font-size: 17px; letter-spacing: 1px; color: var(--cyan); text-shadow: 2px 2px 0 var(--line); }
+  .brand-name { font-size: 17px; letter-spacing: 1px; color: var(--blue); text-shadow: 2px 2px 0 var(--line-soft); }
   .brand-status { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .brand-status .dot {
     display: inline-block; width: 7px; height: 7px; background: #2fbf71; margin-right: 5px;
@@ -81,8 +76,8 @@
   }
   .new-chat {
     font-family: inherit; font-size: 13px;
-    color: var(--text); background: var(--blue);
-    border: 3px solid var(--line); box-shadow: 3px 3px 0 rgba(3, 6, 24, .6);
+    color: #fff; background: var(--blue);
+    border: 3px solid var(--line); box-shadow: 3px 3px 0 rgba(39, 75, 159, .25);
     padding: 7px 12px; cursor: pointer;
   }
   .new-chat:hover { background: var(--blue-hi); }
@@ -93,23 +88,23 @@
     display: flex; flex-direction: column; gap: 16px;
   }
   .messages::-webkit-scrollbar { width: 14px; }
-  .messages::-webkit-scrollbar-track { background: var(--panel-deep); border-left: 3px solid var(--line); }
-  .messages::-webkit-scrollbar-thumb { background: var(--blue); border: 3px solid var(--line); }
+  .messages::-webkit-scrollbar-track { background: var(--panel-deep); border-left: 3px solid var(--line-soft); }
+  .messages::-webkit-scrollbar-thumb { background: var(--blue); border: 3px solid var(--line-soft); }
   ::selection { background: var(--blue); color: #fff; }
 
   .welcome {
     margin: auto; width: 88%;
     background: var(--panel-deep);
     border: 3px solid var(--blue);
-    box-shadow: var(--shadow), inset 0 0 0 3px var(--line);
+    box-shadow: var(--shadow);
     padding: 18px 18px 24px;
     font-size: 16px; line-height: 2; color: var(--text);
     position: relative;
   }
-  .welcome .ok { color: var(--cyan); }
+  .welcome .ok { color: var(--blue); }
   .welcome::after {
     content: "▼"; position: absolute; right: 12px; bottom: 4px;
-    color: var(--cyan); font-size: 14px;
+    color: var(--blue); font-size: 14px;
     animation: blink 1s steps(2) infinite;
   }
   @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
@@ -124,13 +119,13 @@
     animation: pop .12s steps(3);
   }
   @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  .msg.assistant .bubble { background: #1a2456; color: var(--text); }
+  .msg.assistant .bubble { background: #ffffff; color: var(--text); }
   .msg.user .bubble { background: var(--blue); color: #fff; }
-  .bubble.error { background: #3a1030; border-color: #ff7a90; color: #ff9db0; }
+  .bubble.error { background: #fdeef0; border-color: #d2455e; color: #b0304a; }
 
   .typing { display: inline-flex; gap: 6px; padding: 3px 0; }
   .typing i {
-    width: 8px; height: 8px; background: var(--cyan);
+    width: 8px; height: 8px; background: var(--blue);
     animation: blink 1s steps(2) infinite;
   }
   .typing i:nth-child(2) { animation-delay: .25s; }
@@ -142,16 +137,16 @@
   }
   .composer input {
     flex: 1; font-family: inherit; font-size: 16px;
-    background: var(--panel); color: var(--text);
-    border: 3px solid var(--line); padding: 10px 12px; outline: none;
+    background: #ffffff; color: var(--text);
+    border: 3px solid var(--line-soft); padding: 10px 12px; outline: none;
   }
   .composer input::placeholder { color: var(--muted); }
-  .composer input:focus { border-color: var(--cyan); }
+  .composer input:focus { border-color: var(--blue); }
   .composer input:disabled { opacity: .55; }
   .composer button {
-    font-family: inherit; font-size: 16px; font-weight: 400;
+    font-family: inherit; font-size: 16px;
     background: var(--blue); color: #fff;
-    border: 3px solid var(--line); box-shadow: 3px 3px 0 rgba(3, 6, 24, .6);
+    border: 3px solid var(--line); box-shadow: 3px 3px 0 rgba(39, 75, 159, .25);
     padding: 0 18px; cursor: pointer;
   }
   .composer button:hover { background: var(--blue-hi); }
@@ -160,33 +155,35 @@
 </style>
 </head>
 <body>
-<div class="stars"><i></i><i></i></div>
+<div class="cloud c1"></div>
+<div class="cloud c2"></div>
+<div class="cloud c3"></div>
 <div class="chat-shell">
   <header class="chat-header">
     <div class="brand">
       <svg class="brand-avatar" viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true">
-        <rect x="5" y="0" width="2" height="2" fill="#55e6ff"/>
-        <rect x="5" y="2" width="2" height="1" fill="#9db8ff"/>
-        <rect x="2" y="3" width="8" height="1" fill="#2a3f9e"/>
-        <rect x="1" y="4" width="10" height="6" fill="#4d7cff"/>
-        <rect x="2" y="10" width="8" height="1" fill="#2a3f9e"/>
-        <rect x="1" y="4" width="1" height="6" fill="#2a3f9e"/>
-        <rect x="10" y="4" width="1" height="6" fill="#2a3f9e"/>
-        <rect x="3" y="6" width="2" height="2" fill="#0a1030"/>
-        <rect x="7" y="6" width="2" height="2" fill="#0a1030"/>
-        <rect x="5" y="8" width="2" height="1" fill="#0a1030"/>
-        <rect x="4" y="4" width="1" height="1" fill="#8fb3ff"/>
+        <rect x="5" y="0" width="2" height="2" fill="#3f7bff"/>
+        <rect x="5" y="2" width="2" height="1" fill="#7da4ff"/>
+        <rect x="2" y="3" width="8" height="1" fill="#274b9f"/>
+        <rect x="1" y="4" width="10" height="6" fill="#5a8dff"/>
+        <rect x="2" y="10" width="8" height="1" fill="#274b9f"/>
+        <rect x="1" y="4" width="1" height="6" fill="#274b9f"/>
+        <rect x="10" y="4" width="1" height="6" fill="#274b9f"/>
+        <rect x="3" y="6" width="2" height="2" fill="#ffffff"/>
+        <rect x="7" y="6" width="2" height="2" fill="#ffffff"/>
+        <rect x="5" y="8" width="2" height="1" fill="#274b9f"/>
+        <rect x="4" y="4" width="1" height="1" fill="#bcd2ff"/>
       </svg>
       <div>
         <div class="brand-name">本店 · 智能客服</div>
-        <div class="brand-status"><span class="dot"></span>ONLINE · 回复为 AI 生成</div>
+        <div class="brand-status"><span class="dot"></span>在线 · 回复为 AI 生成</div>
       </div>
     </div>
     <button id="newChatBtn" class="new-chat" title="开启新会话（清除当前对话窗口）">新会话</button>
   </header>
   <main id="messages" class="messages">
     <div class="welcome">
-      <span class="ok">你好，冒险者！我是本店智能客服 🤖</span><br>
+      <span class="ok">你好！我是本店智能客服 🤖</span><br>
       订单查询、退货退款、物流售后的问题都可以问我。<br>
       点击下方输入框开始对话吧！
     </div>
