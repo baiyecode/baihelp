@@ -26,3 +26,19 @@ def load_extraction_prompt() -> ChatPromptTemplate:
             ("human", "{text}"),
         ]
     )
+
+
+def load_qa_extraction_prompt() -> ChatPromptTemplate:
+    """历史对话挖 QA 模板，渲染时需提供 ``conversations``（拼接后的会话块文本）。
+
+    模板的输出契约含 JSON 对象示例（字面花括号），故用 mustache 模板格式：
+    system 模板里的单花括号原样保留；human 占位用三花括号 ``{{{conversations}}}``
+    关闭 HTML 转义——会话文本含 <、&、" 时必须原样送达，不得被转义破坏。
+    """
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", _read_template("qa_extraction_prompt.md")),
+            ("human", "{{{conversations}}}"),
+        ],
+        template_format="mustache",
+    )
