@@ -32,7 +32,11 @@ class MilvusKnowledgeRepo:
         self._client.create_collection(COLLECTION_NAME, schema=schema, index_params=index_params)
 
     def upsert_vectors(self, rows: list[dict]) -> None:
-        """按主键 id 覆盖写入;同 id 重复 upsert 不产生重复行。"""
+        """按主键 id 覆盖写入;同 id 重复 upsert 不产生重复行。
+
+        行 dict 只能含 {"id", "vector"} 两键(集合未开 dynamic field):多传任何
+        其他键(如原文 text)即抛 DataNotMatchException,调用方负责裁剪字段。
+        """
         self._client.upsert(COLLECTION_NAME, data=rows)
 
     def search(self, query_vector: list[float], top_k: int) -> list[tuple[int, float]]:
