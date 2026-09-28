@@ -46,6 +46,25 @@ def test_overlap_starts_at_sentence_boundary() -> None:
         assert head in prev.answer  # 与前块形成重叠
 
 
+def test_overlap_falls_back_to_last_full_sentence_when_window_has_no_boundary() -> None:
+    """正文有句读但重叠窗口内无边界:回退到全文最近句边界,下一块以完整原句开头。
+
+    长句(289 字无句读)+ 短句(49 字)+ 超宽句逼出换块:块尾 80 字窗口内只有
+    长句中段,重叠不得从长句中段硬切,须回退为完整的短句;硬切仅留给全文无句读。
+    """
+    long_sentence = "长" * 289 + "。"
+    short_sentence = "短" * 48 + "。"
+    wide_sentence = "宽" * 200 + "。"
+    body = long_sentence + short_sentence + wide_sentence
+    assert len(body) > 500
+
+    chunks = chunk_document(_doc(body))
+
+    assert len(chunks) == 2
+    assert chunks[0].answer == long_sentence + short_sentence  # 块尾是完整短句
+    assert chunks[1].answer.startswith(short_sentence)  # 重叠 = 完整原句,非长句中段
+
+
 def test_short_section_single_chunk_no_overlap() -> None:
     """不超长的节恰好一块,answer 即原文,无重叠副本。"""
     body = "订单签收后七天内可无理由退货,超期需联系客服。"

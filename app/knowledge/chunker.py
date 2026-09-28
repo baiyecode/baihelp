@@ -242,7 +242,8 @@ def _sentence_units(text: str, max_chars: int) -> list[str]:
 def _overlap_tail(chunk: str, overlap_chars: int) -> str:
     """取相邻块重叠尾段:目标长 overlap_chars,起点回退到最近句边界之后(完整成句)。
 
-    不足 overlap_chars 的短块整块作重叠;窗口内找不到句边界则硬切(不留则已,留则整句)。
+    窗口内无句边界时回退到全文最近句边界(末字符除外,防回退到块尾之后取空),
+    硬切仅留给全文确无句边界的超长无句读块;不足 overlap_chars 的短块整块作重叠。
     """
     if overlap_chars <= 0:
         return ""
@@ -251,7 +252,10 @@ def _overlap_tail(chunk: str, overlap_chars: int) -> str:
     cut = len(chunk) - overlap_chars
     nearest = max(chunk.rfind(ch, 0, cut) for ch in _SENTENCE_BOUNDARIES)
     if nearest < 0:
-        return chunk[cut:]  # 超长无句读:硬切
+        # 窗口内无边界:仍须整句重叠,回退全文最近句边界(spec 硬切仅限全文无句读)
+        nearest = max(chunk.rfind(ch, 0, len(chunk) - 1) for ch in _SENTENCE_BOUNDARIES)
+        if nearest < 0:
+            return chunk[cut:]  # 全文无句读:硬切
     return chunk[nearest + 1 :]
 
 
