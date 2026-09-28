@@ -11,6 +11,8 @@ import pytest
 
 _ENV_BEFORE_PYMILVUS = dict(os.environ)
 
+from pymilvus import MilvusClient  # noqa: E402
+
 from app.knowledge.milvus_repo import COLLECTION_NAME, MilvusKnowledgeRepo  # noqa: E402
 
 # pymilvus 导入时会对仓库根 .env 执行 load_dotenv(实测证据见 task-5-report.md),
@@ -76,6 +78,28 @@ def test_close_then_reopen_persists(tmp_path: Path) -> None:
         reopened.ensure_collection()  # 已存在,应幂等跳过
         hits = reopened.search(VEC_A, top_k=2)
         assert [hit_id for hit_id, _ in hits] == [7, 8]  # close 后新开 client 数据仍在
+    finally:
+        reopened.close()
+
+
+def test_ensure_collection_loads_released_collection(tmp_path: Path) -> None:
+    """持锁进程被硬杀后集合可能落盘为 released 状态;ensure_collection 须加载自愈。"""
+    db_path = tmp_path / "milvus.db"
+    repo = _make_repo(db_path)
+    repo.upsert_vectors([{"id": 9, "vector": VEC_A}])
+    repo.close()
+
+    # 模拟硬杀后的落盘状态:另一进程将集合显式置为 released(实测:此时 search 抛
+    # MilvusException code=101 "Collection 'knowledge' is in state 'released'")
+    killer = MilvusClient(str(db_path))
+    killer.release_collection(COLLECTION_NAME)
+    killer.close()
+
+    reopened = MilvusKnowledgeRepo(db_path=db_path, dim=DIM)
+    try:
+        reopened.ensure_collection()  # 存在但未加载 → 应补 load_collection
+        hits = reopened.search(VEC_A, top_k=1)  # 不应抛 MilvusException code=101
+        assert [hit_id for hit_id, _ in hits] == [9]
     finally:
         reopened.close()
 
