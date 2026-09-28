@@ -12,11 +12,12 @@ r"""QA 挖矿评估跑分脚本(standalone harness,无 pytest;以标注样例替
       以隔离单例判分),source 用样例 id;
     - 挖矿样例(expect_qa 非空):每条 expect 要求存在至少一个抽取对,其 question 含
       q_contains 全部关键词、answer 含 a_contains 全部关键词;
-    - 噪音样例(expect_qa == []):纯寒暄 / 无实质答案转人工对话,应抽出 0 对。
+    - 噪音样例(expect_qa == []):纯寒暄 / 无实质答案转人工 / 敷衍推诿话术 /
+      具体订单号个案 + mock 数据对话,应抽出 0 对。
 
 门禁(binding)两条:
     1. 全部 expect_qa 被满足(每个挖矿样例的每条 expect 都被至少一个抽取对命中);
-    2. 噪音行 0 抽取(寒暄/转人工话术不得被挖成知识)。
+    2. 噪音行 0 抽取(寒暄/转人工/敷衍话术/个案 mock 数据不得被挖成知识)。
 全部达标 exit 0,未达标 exit 1(并打印未达标项)。配置/数据错误 exit 2。
 
 单条抽取抛异常(网络错误、输出解析失败等)该条判负,继续跑完剩余样例。
@@ -47,7 +48,8 @@ CASES_PATH = Path(__file__).resolve().parent / "qa_mine_cases.jsonl"
 
 VALID_ROLES: frozenset[str] = frozenset({"user", "assistant"})
 
-# 样例集分布约束(id 前缀即 bucket;钉死 Task 7 六话题 + 变说法 + 包邮数字 + 一会话双话题 + 噪音)
+# 样例集分布约束(id 前缀即 bucket;钉死 Task 7 六话题 + 变说法 + 包邮数字 + 一会话双话题
+# + 噪音 + 敷衍话术/个案 mock 两类反例)
 BUCKET_EXPECTED: dict[str, int] = {
     "refund": 2,  # 退款到账时效(直接问 + 「钱什么时候回来」变说法)
     "address": 1,  # 修改收货地址
@@ -59,8 +61,10 @@ BUCKET_EXPECTED: dict[str, int] = {
     "multi": 1,  # 一通会话双话题(发货时效 + 支付方式)
     "noise": 2,  # 噪音对照:纯寒暄 + 无实质答案转人工
     "warranty": 1,  # 保修时效
+    "hedge": 1,  # 反例:敷衍推诿回答(无任何具体事实,纯话术)
+    "mock": 1,  # 反例:具体订单号个案查询 + 系统 mock 数据
 }
-TOTAL_EXPECTED = sum(BUCKET_EXPECTED.values())  # 12 条
+TOTAL_EXPECTED = sum(BUCKET_EXPECTED.values())  # 14 条
 
 
 # ---------------------------------------------------------------------------
@@ -656,7 +660,9 @@ async def run_self_test() -> int:
         empty_dialogue[0] = dict(empty_dialogue[0])
         empty_dialogue[0]["dialogue"] = []
         _expect_value_error(lambda: validate_cases(empty_dialogue), "空对话的样例集")
-        no_noise = [dict(case) for case in cases if not case["id"].startswith("noise-")]
+        # 无噪音对照:剔除全部 expect_qa==[] 行(不论 id 前缀是 noise/hedge/mock),
+        # 让「至少 1 条噪音」守卫真正触发
+        no_noise = [dict(case) for case in cases if case["expect_qa"]]
         _expect_value_error(lambda: validate_cases(no_noise), "无噪音对照的样例集")
         wrong_dist = [case for case in cases if case["id"] != "refund-02"]
         _expect_value_error(lambda: validate_cases(wrong_dist), "分布不符的样例集")

@@ -10,3 +10,5 @@
 {"id": "noise-01", "dialogue": [{"role": "user", "content": "在吗?"}, {"role": "assistant", "content": "在的亲~请问有什么可以帮您?"}, {"role": "user", "content": "没事,就是看看客服在不在,拜拜~"}, {"role": "assistant", "content": "好嘞,祝您生活愉快,欢迎下次再来哦!"}], "expect_qa": []}
 {"id": "noise-02", "dialogue": [{"role": "user", "content": "我的包裹丢了,你们必须今天给我解决,不然我就投诉到消费者协会!"}, {"role": "assistant", "content": "非常抱歉给您添麻烦了,您的情况我已经详细记录,马上为您转接人工专员处理,请保持电话畅通哦~"}, {"role": "user", "content": "行吧,那人工多久联系我?"}, {"role": "assistant", "content": "人工专员会尽快与您联系哒,请耐心等待~"}], "expect_qa": []}
 {"id": "warranty-01", "dialogue": [{"role": "user", "content": "买的电饭煲坏了,保修多久啊?"}, {"role": "assistant", "content": "亲,电器类商品保修期为签收后十二个月,保修期内非人为损坏的质量故障可免费维修或更换同型号新品哦~"}], "expect_qa": [{"q_contains": ["保修"], "a_contains": ["十二个月"]}]}
+{"id": "hedge-fee-01", "dialogue": [{"role": "user", "content": "邮费是多少啊?"}, {"role": "assistant", "content": "您好,邮费会根据商品、重量和收货地址有所不同。麻烦您提供一下具体商品或订单号,我帮您核实准确运费信息哈。"}], "expect_qa": []}
+{"id": "mock-order-01", "dialogue": [{"role": "user", "content": "订单 1001 的物流到哪了"}, {"role": "assistant", "content": "您好,订单 1001 当前状态显示已取消,但物流显示派送中,建议转人工核实哦。"}], "expect_qa": []}

@@ -358,6 +358,6 @@ def test_qa_extraction_prompt_contract() -> None:
     assert "JSON 数组" in system  # ① 仅输出一个 JSON 数组
     for field in ("source", "question", "answer"):
         assert f'"{field}"' in system  # ② 元素三字段
-    for noise in ("寒暄", "转人工", "工单"):
-        assert noise in system  # ③ 过滤规则:寒暄/转人工/工单受理不产出
+    for noise in ("寒暄", "转人工", "工单", "个案", "mock", "敷衍"):
+        assert noise in system  # ③ 过滤规则:寒暄/转人工/工单受理/个案查询/mock 数据/敷衍话术不产出
     assert "source=" in system  # source 取会话块标记里的标识
