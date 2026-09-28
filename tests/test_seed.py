@@ -2,9 +2,13 @@
 
 seed 是数据类产出:同一 SQLite 会话工厂上连跑两次,验证——
 
-- 各表行数恒定:faq 8、演示会话 1(user_id="seed-demo")、其消息 3、tickets 1,
+- 各表行数恒定:faq 8、演示会话 1(user_id="seed-demo")、其消息 3、
+  历史会话 8(user_id 前缀 "seed-hist-",消息 56 条)、tickets 1,
   返回值 dict[str, int] 与库里实况一致;
 - 演示会话消息 role user/assistant/tool 各一,tool 行带 tool_call_id;
+- 历史会话(挖矿语料)存在即整批跳过(第四幂等判据),消息只含 user/assistant
+  纯文本行,每通 3~5 轮;6 个可挖主题关键词一律出现在 user 消息里,
+  另有纯寒暄/无答案转人工两通噪音对照;
 - 8 条 faq 的 question 一律不含「邮费」「运费」子串——用户问「邮费是多少」时
   query_faq 必须 LIKE 落空,这是漏召回验收(acceptance ⑥)的前提;
 - question 含「退货政策」的行存在且 answer 含「七天」(acceptance ⑤ 判据词)。
@@ -50,7 +54,13 @@ async def test_seed_twice_is_idempotent(
     first = await seed(session_factory)
     second = await seed(session_factory)
 
-    expected = {"conversations": 1, "messages": 3, "faq": 8, "tickets": 1}
+    expected = {
+        "conversations": 9,  # 1(演示)+ 8(历史)
+        "messages": 59,  # 3(演示)+ 56(历史八通,3~5 轮 × 2 行)
+        "faq": 8,
+        "tickets": 1,
+        "history_conversations": 8,
+    }
     assert first == expected
     assert second == expected
 
@@ -66,7 +76,7 @@ async def test_seed_twice_is_idempotent(
         # 演示工单固定号 T{当日YYYYMMDD}901,给真实工单(create_ticket 当日 001 起)留低位号段
         tickets = (await session.scalars(select(Ticket))).all()
 
-    assert (faq_count, conversation_count, message_count, ticket_count) == (8, 1, 3, 1)
+    assert (faq_count, conversation_count, message_count, ticket_count) == (8, 9, 59, 1)
     assert [ticket.ticket_no for ticket in tickets] == [
         "T" + datetime.now().strftime("%Y%m%d") + "901"
     ]
@@ -156,3 +166,119 @@ async def test_seed_faq_return_policy_answer_contains_seven_days(
 
     assert faqs, "必须存在 question 含「退货政策」的行"
     assert any("七天" in faq.answer for faq in faqs)
+
+
+# ---------------------------------------------------------------------------
+# 历史会话:挖矿语料(第四幂等判据)
+# ---------------------------------------------------------------------------
+
+# 六个可挖主题(退款到账时效/修改收货地址/优惠券过期/发票抬头修改/换货运费
+# 承担/预售发货时间)的关键词,要求一律出现在 seed-hist-* 会话的 user 消息里
+_HISTORY_TOPIC_KEYWORDS: tuple[str, ...] = (
+    "退款",
+    "地址",
+    "优惠券",
+    "发票",
+    "换货",
+    "预售",
+)
+
+
+@pytest.mark.asyncio
+async def test_seed_history_dialogues_idempotent(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """历史会话第四判据:seed-hist-* 存在即整批跳过——两连跑 history_conversations
+    恒 8、messages 总数第二遍不变;历史消息只含 user/assistant 纯文本行,
+    每通 3~5 轮且 user/assistant 交替、由 user 先开口。"""
+    first = await seed(session_factory)
+    second = await seed(session_factory)
+
+    assert first["history_conversations"] == second["history_conversations"] == 8
+    assert second["messages"] == first["messages"] == 59  # 3(演示)+ 8 通共 56 条
+
+    async with session_factory() as session:
+        hist_conversations = (
+            (
+                await session.scalars(
+                    select(Conversation).where(
+                        Conversation.user_id.like("seed-hist-%")
+                    )
+                )
+            )
+            .unique()
+            .all()
+        )
+        hist_message_count = await session.scalar(
+            select(func.count())
+            .select_from(Message)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+            .where(Conversation.user_id.like("seed-hist-%"))
+        )
+        hist_messages = (
+            (
+                await session.scalars(
+                    select(Message)
+                    .join(Conversation, Message.conversation_id == Conversation.id)
+                    .where(Conversation.user_id.like("seed-hist-%"))
+                    .order_by(Message.id)
+                )
+            )
+            .unique()
+            .all()
+        )
+
+    assert len(hist_conversations) == 8
+    assert {conv.user_id for conv in hist_conversations} == {
+        f"seed-hist-{serial:02d}" for serial in range(1, 9)
+    }
+    assert hist_message_count == 56  # 库里实况:8 通 × 3~5 轮 × 2 行
+    for message in hist_messages:
+        # 只造纯文本行:role 不含 tool,不带工具调用申请单/回执 id
+        assert message.role in ("user", "assistant")
+        assert message.content
+        assert not message.tool_calls
+        assert not message.tool_call_id
+
+    # 每通会话内 user/assistant 交替且 user 先开口,轮数落在 3~5
+    roles_by_conversation: dict[int, list[str]] = {}
+    for message in hist_messages:
+        roles_by_conversation.setdefault(message.conversation_id, []).append(
+            message.role
+        )
+    for roles in roles_by_conversation.values():
+        assert roles == ["user", "assistant"] * (len(roles) // 2)
+        assert 3 <= len(roles) // 2 <= 5
+
+    # 噪音对照在场:无答案转人工的那通,状态应为「已转人工」
+    assert {conv.status for conv in hist_conversations} >= {"已转人工"}
+
+
+@pytest.mark.asyncio
+async def test_seed_history_topics_present(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """6 个可挖主题关键词一律出现在 seed-hist-* 会话的 user 消息里,
+    供 mine_qa 抽问答对、评估集与 live 挖矿对齐话题覆盖。"""
+    await seed(session_factory)
+
+    async with session_factory() as session:
+        user_contents = (
+            (
+                await session.scalars(
+                    select(Message.content)
+                    .join(Conversation, Message.conversation_id == Conversation.id)
+                    .where(
+                        Conversation.user_id.like("seed-hist-%"),
+                        Message.role == "user",
+                    )
+                )
+            )
+            .unique()
+            .all()
+        )
+
+    assert user_contents, "历史会话必须存在 user 消息"
+    blob = "\n".join(user_contents)
+    missing = [keyword for keyword in _HISTORY_TOPIC_KEYWORDS if keyword not in blob]
+    assert not missing, f"可挖主题关键词缺席:{missing}"
