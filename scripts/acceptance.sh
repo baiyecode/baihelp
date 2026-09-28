@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 端到端验收脚本 —— ch01/pure-chat + ch02/function-calling
-# （spec §10 / task-10 Step 1 立稿；ch02 task-13 扩展验收④⑤⑥）
+# 端到端验收脚本 —— ch01/pure-chat + ch02/function-calling + ch03/rag-knowledge-base
+# （spec §10 / task-10 Step 1 立稿；ch02 task-13 扩展验收④⑤⑥；ch03 task-11 反转⑥、新增⑦）
 #
 # 前提假设（本脚本不负责满足，违反时结果无意义）：
 #   1. 服务已在运行：请在仓库根目录先执行 `uv run uvicorn app.main:app`
@@ -10,7 +10,7 @@
 #   2. 项目根目录 `.env` 已配置真实凭据（LLM_API_KEY，参考 .env.example）：
 #      服务端启动 fail-fast 依赖它，对话/抽取质量依赖真实模型。
 #
-# 六条验收：
+# 七条验收：
 #   ① 流式对话：POST /api/chat/stream（curl -N）——
 #      至少一行 `data: {"choices"` 开头的 OpenAI 兼容 delta 事件，
 #      且流的最后一个非空事件是 `data: [DONE]`。
@@ -29,12 +29,16 @@
 #   ⑤ FAQ 命中（ch02）：POST「退货政策是什么」——
 #      工具事件帧存在（query_faq 触发），且合并 delta 回答含「七天」判据词
 #      （task-5 种子 FAQ：该条 answer 含「七天」）。
-#   ⑥ 漏召回演示（ch02）：POST「邮费是多少」——
-#      种子 question 列刻意不含「邮费/运费」，query_faq 的 LIKE 查询预期
-#      落空（漏召回成立）。判据只验工具帧名含 query_faq（命中即 PASS），
-#      完整回答照打留痕，回答措辞不判分。
+#   ⑥ 向量召回演示（ch03）：POST「邮费是多少」——
+#      ch02 时是漏召回演示（种子 question 列刻意不含「邮费/运费」，LIKE 落空）；
+#      ch03 向量检索上线后该问句语义命中退货政策.md 的「运费说明」块，判据反转为
+#      双条件：工具帧名含 query_faq，且合并回复含「包邮」或「99」（任一即可，
+#      双判据降 flaky）。
+#   ⑦ 挖矿自检（ch03）：uv run python -m app.knowledge.mine_qa --self-test——
+#      零外部依赖（sqlite 内存 + 内联假会话 + 罐头 LLM）的挖矿全管线离线自测，
+#      退出码 0 判 PASS。不依赖服务，放在前置健康检查之前执行。
 #
-# 结果：逐条打印 PASS/FAIL + 汇总；六条验收全部通过 exit 0，任一失败 exit 1；
+# 结果：逐条打印 PASS/FAIL + 汇总；七条验收全部通过 exit 0，任一失败 exit 1；
 #       前置健康检查失败（服务未运行/不可达）exit 2 并给出启动提示。
 # ============================================================================
 set -euo pipefail
@@ -115,7 +119,17 @@ sys.stdout.write(" ".join(names))
 '
 }
 
-# 前置健康检查（不计入六条验收）：服务不可达时直接给出可操作提示。
+# 验收⑦（ch03 挖矿自检）不依赖服务：--self-test 零外部依赖，放在前置健康检查
+# 之前执行——服务未起时也能单独拿到挖矿自检结果（①-⑥ 仍以服务可达为前提）。
+echo
+echo "== 验收⑦ 挖矿自检：uv run python -m app.knowledge.mine_qa --self-test =="
+self7_ok=0
+if uv run python -m app.knowledge.mine_qa --self-test 2>&1 | sed 's/^/  | /'; then
+  self7_ok=1
+fi
+report "⑦ 挖矿自检：--self-test 退出码 0（挖矿全管线离线跑通）" "$self7_ok"
+
+# 前置健康检查（不计入七条验收）：服务不可达时直接给出可操作提示。
 echo "== 前置检查：GET $BASE_URL/api/healthz =="
 if ! healthz="$(curl -s --connect-timeout 3 --max-time 10 "$BASE_URL/api/healthz")"; then
   echo "服务不可达：请先在仓库根目录运行 \`uv run uvicorn app.main:app\`，再执行本脚本。" >&2
@@ -227,10 +241,10 @@ grep -qF "七天" <<<"$stream5_text" && seven_ok=1
 report "⑤ FAQ：合并回复含「七天」" "$seven_ok"
 
 echo
-echo "== 验收⑥ 漏召回演示：POST「邮费是多少」=="
-echo "  前提：种子 FAQ 的 question 列刻意不含「邮费/运费」，query_faq 的 LIKE 查询"
-echo "  预期落空——漏召回成立。本验收只判「走了 query_faq 工具」（命中即 PASS）；"
-echo "  完整回答照打留痕，回答措辞不判分（漏召回后模型如何补救不在验收范围）。"
+echo "== 验收⑥ 向量召回演示：POST「邮费是多少」（ch03 向量检索）=="
+echo "  ch02 时代本条是漏召回演示（LIKE 落空）；ch03 向量检索上线后该问句语义"
+echo "  命中退货政策.md 的「运费说明」块。判据双条件：走了 query_faq 工具，且"
+echo "  合并回复含「包邮」或「99」（任一即可，双判据降 flaky）。"
 stream6="$(curl_post /api/chat/stream \
   "{\"session_id\":\"acc-6-$RUN_ID\",\"message\":\"邮费是多少\"}")"
 printf '%s\n' "$stream6" | sed 's/^/  | /'
@@ -239,11 +253,15 @@ faq6_names="$(printf '%s\n' "$stream6" | tool_names)"
 echo "  工具帧名：${faq6_names:-（无）}"
 faq6_ok=0
 grep -qF "query_faq" <<<"$faq6_names" && faq6_ok=1
-report "⑥ 漏召回：工具帧名含 query_faq（命中即 PASS，措辞不判分）" "$faq6_ok"
+report "⑥ 向量召回：工具帧名含 query_faq" "$faq6_ok"
 
-# 合并回复照打留痕：LIKE 落空后模型可能道歉或给通用回答，均不作判分对象。
+# 「包邮」/「99」判据词在「运费说明」块 answer 里，必须合并全部 delta 后再匹配
+# （与验收②⑤同理：token 边界可能把判据词切进相邻两个 delta）。
 stream6_text="$(printf '%s\n' "$stream6" | merge_delta_text)"
-echo "  合并回复（留痕，不判分）：$stream6_text"
+echo "  合并回复：$stream6_text"
+ship6_ok=0
+grep -qE "包邮|99" <<<"$stream6_text" && ship6_ok=1
+report "⑥ 向量召回：合并回复含「包邮」或「99」" "$ship6_ok"
 
 echo
 echo "== 验收汇总 =="
@@ -252,12 +270,13 @@ echo "  ② 上下文记忆（第二轮复述订单号）:       $([[ $ctx_ok ==
 echo "  ③ 结构化抽取（JSON + complaint_type）:  $([[ $extract_ok == 1 ]] && echo PASS || echo FAIL)"
 echo "  ④ 工具调用（工具帧 + [DONE] 收尾）:     $([[ $tool4_ok == 1 && $done4_ok == 1 ]] && echo PASS || echo FAIL)"
 echo "  ⑤ FAQ 命中（工具帧 + 回答含「七天」）:  $([[ $tool5_ok == 1 && $seven_ok == 1 ]] && echo PASS || echo FAIL)"
-echo "  ⑥ 漏召回演示（走了 query_faq 即可）:    $([[ $faq6_ok == 1 ]] && echo PASS || echo FAIL)"
+echo "  ⑥ 向量召回演示（工具帧 + 回复含「包邮」/「99」）: $([[ $faq6_ok == 1 && $ship6_ok == 1 ]] && echo PASS || echo FAIL)"
+echo "  ⑦ 挖矿自检（mine_qa --self-test 退出码 0）:      $([[ $self7_ok == 1 ]] && echo PASS || echo FAIL)"
 
 if [[ "$fail_count" -ne 0 ]]; then
   echo "结论: FAIL（$pass_count/$((pass_count + fail_count)) 项判据通过）"
   exit 1
 fi
-# PASS 分支同样按动态判据计数输出(与 FAIL 分支口径一致),六条验收语义用文字保留
-echo "结论: PASS(六条验收全过,$pass_count 项判据全部通过)"
+# PASS 分支同样按动态判据计数输出(与 FAIL 分支口径一致),七条验收语义用文字保留
+echo "结论: PASS(七条验收全过,$pass_count 项判据全部通过)"
 exit 0

@@ -6,7 +6,8 @@
 |---|---|---|
 | Ch01 | 纯对话:SSE 流式输出、多轮上下文、Prompt 模板化、售后结构化抽取 | ✅ 完成 |
 | Ch02 | Function Calling:LangChain `@tool` 单轮工具调用 + MySQL 持久化 | ✅ 完成 |
-| Ch03+ | Agent 循环(LangGraph)、向量检索、可观测 | 🚧 规划中 |
+| Ch03 | RAG 知识库:结构感知切分、历史会话挖知识、向量检索双写(Milvus) | ✅ 完成 |
+| Ch04+ | Agent 循环(LangGraph)、可观测 | 🚧 规划中 |
 
 技术栈:FastAPI · SQLAlchemy 2.0(异步) · MySQL 8.4(Docker) · LangChain 1.x · SSE · pytest
 
@@ -27,6 +28,12 @@
 - MySQL 写穿 — user / assistant / tool 消息实时落 conversations / messages 表;建表 DDL 见 `scripts/sql/ch02-ddl.sql`
 - 工具轨迹徽章 — 聊天页气泡内实时显示本次调用了哪些工具(虚线徽章,查询中闪烁、完成落定),普通问答零变化
 
+**RAG 知识库(Ch03)**
+
+- 结构感知切分 — `data/knowledge/*.md` 语料(front-matter 带 category / key_clauses 元数据)按标题层级切块入库,`section_path` 保留「根分类 > 章 > 节」归属
+- 历史会话挖知识 — `python -m app.knowledge.mine_qa` 分批抽取历史客服会话中的 QA 对,暂存 → 整体去重 → 入库知识块;`--self-test` 提供零外部依赖的离线自检
+- 向量检索双写 — 建库编排把知识块写 MySQL、向量写 Milvus Lite(自然键幂等 + pending 补齐 + vector_id 回填);`query_faq` 对外契约不变,内部从 SQL LIKE 切换为向量语义检索,根治关键词漏召回
+
 ## 快速开始
 
 前提:Python 3.14+、[uv](https://docs.astral.sh/uv/)、Docker Desktop。
@@ -36,10 +43,13 @@ git clone https://github.com/baiyecode/baihelp.git
 cd baihelp
 uv sync
 
-cp .env.example .env        # 填入 LLM_API_KEY;本地 .env 的 DATABASE_URL 端口改成 3307(见下)
+cp .env.example .env        # 填入 LLM_API_KEY 与 EMBEDDING_API_KEY;本地 .env 的 DATABASE_URL 端口改成 3307(见下)
+mkdir -p data/milvus        # 必建:启动期 MilvusClient 不自建父目录,而该目录已被 gitignore(fresh clone 没有)
 
 docker compose up -d        # 起 MySQL(宿主 3307,首启自动按 scripts/sql/ch02-ddl.sql 建表)
 uv run python -m app.db.seed  # 幂等灌测试数据(FAQ 8 条 / 演示会话 / 演示工单)
+uv run python -m app.knowledge.ingest  # 建知识库(必须):语料切块入 MySQL + 批量向量化双写 Milvus
+uv run python -m app.knowledge.mine_qa  # 可选:从历史客服会话挖 QA 对入库(走真 LLM;--self-test 可零依赖自检)
 
 uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 并给出操作提示
 # 打开 http://127.0.0.1:8000/
@@ -54,8 +64,8 @@ uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 
 | 你问 | 会发生什么 |
 |---|---|
 | 「订单 1001 的物流到哪了」 | 气泡上方出现工具徽章(query_order / query_logistics),回答基于工具返回的 mock 数据 |
-| 「退货政策是什么」 | 触发 query_faq,LIKE 命中种子 FAQ 并作答 |
-| 「邮费是多少」 | query_faq 被选中但关键词查不到——**已知漏召回**,模型诚实兜底;这是刻意留的演示,留给后续向量检索升级 |
+| 「退货政策是什么」 | 触发 query_faq,向量检索命中知识库并作答 |
+| 「邮费是多少」 | 种子 question 刻意不含「邮费/运费」——ch02 时是已知漏召回,ch03 起向量检索语义命中「运费说明」块作答,正是漏召回被向量检索根治的演示 |
 
 ### 模型供应商
 
@@ -79,12 +89,18 @@ uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 
 | `REQUEST_TIMEOUT` | 60 | 模型请求超时(秒) |
 | `TOOL_TIMEOUT_SECONDS` | 10 | 单次工具执行超时 |
 | `TOOL_MAX_RETRIES` | 1 | 工具超时/异常重试次数 |
+| `EMBEDDING_API_KEY` | 必填 | 嵌入模型密钥(SiliconFlow,缺省模型 `BAAI/bge-m3`),缺失时启动即失败 |
+| `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` / `EMBEDDING_DIM` | SiliconFlow / `BAAI/bge-m3` / 1024 | 嵌入端点三元组 |
+| `MILVUS_DB_PATH` | `data/milvus/baihelp.db` | Milvus Lite 本地向量库文件 |
+| `RETRIEVAL_TOP_K` / `RETRIEVAL_SCORE_THRESHOLD` | 3 / 0.5 | 向量召回条数上限与相似度阈值 |
+| `CHUNK_MAX_CHARS` / `CHUNK_OVERLAP_CHARS` | 500 / 80 | 语料切块最大字符数与相邻块重叠字符数 |
+| `QA_MINE_BATCH_SIZE` | 4 | 挖矿每批处理的会话数 |
 
 ## 验证
 
 ```bash
-uv run pytest                                # 91 个单元测试
-bash scripts/acceptance.sh                   # 端到端 6 判据:流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 漏召回演示
+uv run pytest                                # 158 个单元测试
+bash scripts/acceptance.sh                   # 端到端 7 判据:流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 向量召回 / 挖矿自检
 uv run python evals/run_eval.py              # Ch01 抽取评估(22 例,字段级门禁)
 uv run python evals/run_tool_eval.py         # Ch02 工具选型评估(19 例,门禁:整体 ≥90% / 闲聊误调 0)
 uv run python evals/run_tool_eval.py --self-test   # 离线自检,无需 API key
@@ -99,11 +115,13 @@ app/
 ├── api/        # 路由:chat(SSE,含工具事件帧)、extract、sse 格式化器
 ├── core/       # .env 配置(pydantic-settings,启动 fail-fast)
 ├── db/         # 引擎/ORM 模型(对齐 DDL)/仓储/幂等种子数据
+├── knowledge/  # RAG 管线:语料加载/结构感知切分/嵌入/Milvus 仓储/建库双写/挖知识
 ├── llm/        # init_chat_model 模型工厂
 ├── prompts/    # Prompt 模板文件 + 加载器
 ├── services/   # 会话存储、裁剪器、对话编排(两段式单轮工具链)、写穿持久化
 ├── tools/      # @tool 五工具 + ToolRegistry(校验/超时重试/错误回灌)
 └── schemas/    # Pydantic 模型
+data/                # knowledge/ 语料(.md,入库 git)+ milvus/ 本地向量库(gitignore,clone 后需 mkdir)
 docker-compose.yml   # MySQL 8.4(3307→3306,initdb 自动建表)
 scripts/             # 端到端验收脚本 + 建表 DDL
 evals/               # 标注评估集 + 跑分器 + 报告归档
@@ -122,5 +140,5 @@ dev-notes/           # 开发过程逐阶段留痕(ch01 / ch02)
 - [x] Ch02 Function Calling 单轮工具链 + 消息写穿持久化
 - [ ] Agent 循环(LangGraph)
 - [ ] 会话历史 DB 化(上下文读路径,当前仍为内存)
-- [ ] 向量检索(Milvus)——根治 FAQ 关键词漏召回
+- [x] 向量检索(Milvus)——根治 FAQ 关键词漏召回
 - [ ] 可观测(Langfuse)
