@@ -71,3 +71,47 @@ vague-03  ok        ok              ok
 ## 验收脚本(同日终验)
 
 `bash scripts/acceptance.sh` → **6/6 PASS**(含④物流工具帧、⑤退货政策命中、⑥邮费漏召回演示)。
+
+---
+
+# Ch03 检索与挖矿评估报告(live)
+
+- 日期:2026-09-29 · 嵌入:BAAI/bge-m3(SiliconFlow)· 生成模型:deepseek-v4-flash-0731(阿里云百炼)· 向量库:milvus-lite 3.2.1 本地库
+- 知识库状态:knowledge_chunks 36 行全 done(语料 20 + 挖矿 16),staging kept 16 / discarded 12
+- 前置说明:首轮建库后 live 验收揪出挖矿 Prompt 过滤缺口(mock 工具演示对话与敷衍回答被当知识入库,挤占检索 top 位)→ Prompt 补个案查询/敷衍回答两条排除规则并清库重挖;另有 MySQL 清行后 Milvus 孤儿向量占位问题 → 重建向量侧(见 dev-notes 阶段 13)。本报告为修复后的终验。
+
+## 检索评估(`evals/run_retrieval_eval.py`)
+
+| id | expect | query | 判分 | 命中详情 |
+|---|---|---|---|---|
+| faq-postage | hit | 邮费是多少 | ok | rank=2 score=0.703 含全部关键词 |
+| faq-shipping-rephrase | hit | 快递费怎么算 | ok | rank=1 score=0.700 含全部关键词 |
+| nohit-boss | no_hit | 你们老板是谁 | ok | 零命中 |
+| nohit-weather | no_hit | 今天天气怎么样 | ok | 零命中(T10 遗留风险项,实测未误召) |
+| policy-return-how | hit | 怎么退货 | ok | rank=2 score=0.730 含全部关键词 |
+| policy-refund-eta | hit | 退款多久能到账 | ok | rank=1 score=0.838 含全部关键词 |
+| policy-return-process | hit | 退货流程是什么 | ok | rank=1 score=0.807 含全部关键词 |
+| faq-coupon-expired | hit | 优惠券过期了还能用吗 | ok | rank=1 score=0.790 含全部关键词 |
+| faq-invoice | hit | 怎么开发票 | ok | rank=1 score=0.691 含全部关键词 |
+| faq-payment | hit | 支持什么付款方式 | ok | rank=1 score=0.752 含全部关键词 |
+| faq-shipping-eta | hit | 下单后多久发货 | ok | rank=1 score=0.797 含全部关键词 |
+| faq-exchange | hit | 尺码不合适怎么换货 | ok | rank=1 score=0.764 含全部关键词 |
+| manual-warranty | hit | 保修期是多久 | ok | rank=1 score=0.744 含全部关键词 |
+
+hit 命中达标(11 条): **11/11** | no_hit 零命中(2 条): **2/2** | **门禁结论: PASS**
+
+## 挖矿评估(`evals/run_mine_eval.py`)
+
+- expect_qa 满足(10 个挖矿样例): **11/11**(含变说法样例「钱什么时候回来」→ 退款时效)
+- 噪音行 0 抽取(4 条): **4/4**(纯寒暄 / 转人工 / **敷衍话术 / mock 订单个案**——后两类为 Prompt 修复新增反例)
+- **门禁结论: PASS**
+
+## ch02 工具选型回归(`evals/run_tool_eval.py`)
+
+- 整体准确率 19 条: **18/19(94.7%)**;none 类误调 0/2;「邮费」样例(faq-postage-miss)选中 query_faq ✅
+- 三门禁(整体 ≥90% / none 误调 0 / 邮费样例必选 query_faq)全过 → **PASS**
+- 唯一失败 logistics-04(时效问题被 query_order 抢答),与 ch02 终验完全相同,门禁容忍内
+
+## 验收脚本(同日终验)
+
+`bash scripts/acceptance.sh` → **7/7 验收 PASS、11/11 判据全过(exit 0)**:⑥「邮费是多少」向量召回判「包邮/99」命中,完整回复为「普通地区实付满 99 元包邮;不满 99 元运费 8 元;偏远地区 12 元」;⑤「退货政策」回答含「七天」;⑦ 挖矿 --self-test 退出 0。
