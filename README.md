@@ -103,7 +103,7 @@ uv run pytest                                # 158 个单元测试
 bash scripts/acceptance.sh                   # 端到端 7 判据:流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 向量召回 / 挖矿自检
 uv run python evals/run_eval.py              # Ch01 抽取评估(22 例,字段级门禁)
 uv run python evals/run_tool_eval.py         # Ch02 工具选型评估(19 例,门禁:整体 ≥90% / 闲聊误调 0)
-uv run python evals/run_mine_eval.py         # Ch03 挖矿抽取评估(12 例,门禁:expect 全满足 / 噪音 0 抽取;--self-test 离线自检)
+uv run python evals/run_mine_eval.py         # Ch03 挖矿抽取评估(14 例,门禁:expect 全满足 / 噪音 0 抽取;--self-test 离线自检)
 uv run python evals/run_retrieval_eval.py    # Ch03 检索评估(13 例,门禁:hit 行 min_rank 内含关键词 / no_hit 零命中;--self-test 离线自检;live 需先完成建库 ingest)
 uv run python evals/run_tool_eval.py --self-test   # 离线自检,无需 API key
 ```
