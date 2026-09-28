@@ -1,0 +1,13 @@
+{"id": "faq-postage", "query": "邮费是多少", "expect": "hit", "answer_contains": ["99", "包邮"], "min_rank": 3, "note": "必含样例:ch02 漏召回记录样例,ch03 向量召回应翻案;语料口径「订单实付金额满 99 元包邮」(data/knowledge/退货政策.md 运费说明)"}
+{"id": "faq-shipping-rephrase", "query": "快递费怎么算", "expect": "hit", "answer_contains": ["运费"], "min_rank": 3, "note": "必含样例:换说法问句——语料只讲「运费」,问句用「快递费」,考语义召回而非字面匹配"}
+{"id": "nohit-boss", "query": "你们老板是谁", "expect": "no_hit", "note": "必含样例:库外语料应被相似度阈值闸住,零命中支撑兜底拒答"}
+{"id": "policy-return-how", "query": "怎么退货", "expect": "hit", "answer_contains": ["七天"], "min_rank": 3, "note": "必含样例:退货时效口径「签收后七天内可申请无理由退货」(退货政策.md 退货时效)"}
+{"id": "policy-refund-eta", "query": "退款多久能到账", "expect": "hit", "answer_contains": ["三个工作日"], "min_rank": 3, "note": "语料口径「一至三个工作日内按原支付路径退回」(退货政策.md 退货流程)"}
+{"id": "policy-return-process", "query": "退货流程是什么", "expect": "hit", "answer_contains": ["订单详情页"], "min_rank": 3, "note": "语料口径「买家在订单详情页提交退货申请」(退货政策.md 退货流程)"}
+{"id": "faq-coupon-expired", "query": "优惠券过期了还能用吗", "expect": "hit", "answer_contains": ["过期"], "min_rank": 3, "note": "语料口径「过期不可恢复」(商品FAQ.md 优惠券使用)"}
+{"id": "faq-invoice", "query": "怎么开发票", "expect": "hit", "answer_contains": ["电子发票"], "min_rank": 3, "note": "语料口径「本店默认开具电子发票」(商品FAQ.md 发票开具)"}
+{"id": "faq-payment", "query": "支持什么付款方式", "expect": "hit", "answer_contains": ["支付宝"], "min_rank": 3, "note": "语料口径「支持微信支付、支付宝、银行卡及花呗分期」(商品FAQ.md 支付方式)"}
+{"id": "faq-shipping-eta", "query": "下单后多久发货", "expect": "hit", "answer_contains": ["四十八小时"], "min_rank": 3, "note": "语料口径「现货商品在付款后四十八小时内发出」(商品FAQ.md 发货时效)"}
+{"id": "faq-exchange", "query": "尺码不合适怎么换货", "expect": "hit", "answer_contains": ["换货"], "min_rank": 3, "note": "语料口径见商品FAQ.md 换货规则与售后手册.md 换货流程"}
+{"id": "manual-warranty", "query": "保修期是多久", "expect": "hit", "answer_contains": ["保修"], "min_rank": 3, "note": "语料口径「电器类商品保修期为签收后十二个月」(售后手册.md 保修条款)"}
+{"id": "nohit-weather", "query": "今天天气怎么样", "expect": "no_hit", "note": "库外闲聊第二例:与电商知识语料无语义交集,应零命中"}
