@@ -1,7 +1,7 @@
 # Ch03 设计文档 — RAG 基础:向量语义检索知识库
 
 - 日期:2026-09-28
-- 状态:设计经计划审批通过(ExitPlanMode);spec 评审中
+- 状态:已批准(设计经 ExitPlanMode 审批 + spec 用户评审通过,2026-09-28)
 - 上章:`2026-09-27-ch02-function-calling-design.md`
 - 用户 DDL(建表唯一依据):`J:\code\SQL\ch03-ddl.sql`,原样复制入仓库 `scripts/sql/ch03-ddl.sql`(自带 `SET NAMES utf8mb4`,ch02 R5 教训已吸收)
 
