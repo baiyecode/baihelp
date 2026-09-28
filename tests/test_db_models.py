@@ -144,6 +144,96 @@ async def test_ticket_type_roundtrip(
 
 
 @pytest.mark.asyncio
+async def test_knowledge_chunk_self_fk_writable_and_pending_default(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """KnowledgeChunk 落库:vectorize_status 默认 'pending',prev/next 自外键可写往返。"""
+    async with session_factory() as session:
+        first = models.KnowledgeChunk(
+            category="售后政策/退货",
+            questions="七天无理由退货\n退货流程是什么",
+            answer="自签收起 7 天内可无理由退货,需保持商品完好。",
+            section_path="售后政策 > 退货",
+            content_type="policy",
+        )
+        session.add(first)
+        await session.flush()
+
+        second = models.KnowledgeChunk(
+            category="售后政策/退货",
+            questions="退货邮费谁出",
+            answer="质量问题由商家承担,非质量问题由买家承担。",
+            content_type="policy",
+            is_key_clause=True,
+            prev_chunk_id=first.id,  # 自外键:前一块指针
+            vectorize_status="done",  # 非默认枚举值原样可写
+        )
+        session.add(second)
+        await session.flush()
+
+        first.next_chunk_id = second.id  # 反向回填:后一块指针
+        await session.commit()
+
+        assert first.vectorize_status == "pending"  # 默认值 flush 即赋值,提交后立即可读
+        assert second.vectorize_status == "done"
+
+    # 换新会话重查,绕开身份映射缓存,验证自外键真实落库往返
+    async with session_factory() as reader:
+        chunks = (
+            (await reader.execute(select(models.KnowledgeChunk).order_by(models.KnowledgeChunk.id)))
+            .scalars()
+            .all()
+        )
+
+    assert [chunk.vectorize_status for chunk in chunks] == ["pending", "done"]
+    assert chunks[0].next_chunk_id == chunks[1].id
+    assert chunks[1].prev_chunk_id == chunks[0].id
+    assert chunks[0].is_key_clause is False
+    assert chunks[1].is_key_clause is True
+
+
+@pytest.mark.asyncio
+async def test_qa_extraction_staging_extracted_default_and_enum_roundtrip(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """QaExtractionStaging 落库:status 默认 'extracted',枚举值 kept 原样往返保真。"""
+    async with session_factory() as session:
+        session.add_all(
+            [
+                models.QaExtractionStaging(
+                    batch_no="batch-20260928-01",
+                    source_ref="session-1001",
+                    question="发票什么时候开?",
+                    answer="订单签收后 3 个工作日内开出电子发票。",
+                ),
+                models.QaExtractionStaging(
+                    batch_no="batch-20260928-01",
+                    question="能发顺丰吗?",
+                    answer="默认中通,补运费可改发顺丰。",
+                    status="kept",  # 非默认枚举值原样可写
+                ),
+            ]
+        )
+        await session.commit()
+
+    async with session_factory() as reader:
+        rows = (
+            (
+                await reader.execute(
+                    select(models.QaExtractionStaging).order_by(models.QaExtractionStaging.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    assert [row.status for row in rows] == ["extracted", "kept"]
+    assert rows[0].source_ref == "session-1001"  # 可空列写入后可读
+    assert rows[1].source_ref is None  # 不传时落 NULL
+    assert rows[0].question == "发票什么时候开?"  # 中文本文往返保真
+
+
+@pytest.mark.asyncio
 async def test_ping_ok_on_sqlite_memory() -> None:
     """连通时 ping 静默通过(以 SQLite 内存库验证 SELECT 1 路径)。"""
     engine = build_engine("sqlite+aiosqlite://")
