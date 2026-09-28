@@ -9,7 +9,7 @@
 | Ch03 | RAG 知识库:结构感知切分、历史会话挖知识、向量检索双写(Milvus) | ✅ 完成 |
 | Ch04+ | Agent 循环(LangGraph)、可观测 | 🚧 规划中 |
 
-技术栈:FastAPI · SQLAlchemy 2.0(异步) · MySQL 8.4(Docker) · LangChain 1.x · SSE · pytest
+技术栈:FastAPI · SQLAlchemy 2.0(异步) · MySQL 8.4(Docker) · Milvus Lite · BGE-M3 嵌入 · LangChain 1.x · SSE · pytest
 
 ## 功能
 
@@ -49,7 +49,7 @@ mkdir -p data/milvus        # 必建:启动期 MilvusClient 不自建父目录,�
 docker compose up -d        # 起 MySQL(宿主 3307,首启自动按 scripts/sql/ch02-ddl.sql 建表)
 uv run python -m app.db.seed  # 幂等灌测试数据(FAQ 8 条 / 演示会话 / 演示工单)
 uv run python -m app.knowledge.ingest  # 建知识库(必须):语料切块入 MySQL + 批量向量化双写 Milvus
-uv run python -m app.knowledge.mine_qa  # 可选:从历史客服会话挖 QA 对入库(走真 LLM;--self-test 可零依赖自检)
+uv run python -m app.knowledge.mine_qa  # 可选:从历史客服会话挖 QA 对入库(走真 LLM;--self-test 可零依赖自检;挖出的块为待向量化状态,重跑一次 ingest 后可被检索)
 
 uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 并给出操作提示
 # 打开 http://127.0.0.1:8000/
@@ -103,6 +103,8 @@ uv run pytest                                # 158 个单元测试
 bash scripts/acceptance.sh                   # 端到端 7 判据:流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 向量召回 / 挖矿自检
 uv run python evals/run_eval.py              # Ch01 抽取评估(22 例,字段级门禁)
 uv run python evals/run_tool_eval.py         # Ch02 工具选型评估(19 例,门禁:整体 ≥90% / 闲聊误调 0)
+uv run python evals/run_mine_eval.py         # Ch03 挖矿抽取评估(12 例,门禁:expect 全满足 / 噪音 0 抽取;--self-test 离线自检)
+uv run python evals/run_retrieval_eval.py    # Ch03 检索评估(13 例,门禁:hit 行 min_rank 内含关键词 / no_hit 零命中;--self-test 离线自检;live 需先完成建库 ingest)
 uv run python evals/run_tool_eval.py --self-test   # 离线自检,无需 API key
 ```
 
@@ -127,7 +129,7 @@ scripts/             # 端到端验收脚本 + 建表 DDL
 evals/               # 标注评估集 + 跑分器 + 报告归档
 tests/               # pytest 单元测试
 docs/superpowers/    # 各章设计 spec 与实施计划
-dev-notes/           # 开发过程逐阶段留痕(ch01 / ch02)
+dev-notes/           # 开发过程逐阶段留痕(ch01 / ch02 / ch03)
 ```
 
 ## 开发方法
