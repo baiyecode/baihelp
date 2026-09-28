@@ -16,6 +16,7 @@ def _make_settings() -> Settings:
         llm_model="unit-test-model",
         llm_base_url="https://llm.example.invalid/v1",
         llm_api_key="sk-unit-test",
+        embedding_api_key="e",
         request_timeout=77,
     )
 

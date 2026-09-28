@@ -6,6 +6,8 @@ __pycache__/
 *.egg-info/
 # Env & secrets
 .env
+# Milvus Lite 本地向量库
+data/milvus/
 # uv
 uv.lock
 # OS/IDE

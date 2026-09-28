@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     )
     tool_timeout_seconds: float = 10.0
     tool_max_retries: int = 1
+    embedding_api_key: str
+    embedding_base_url: str = "https://api.siliconflow.cn/v1"
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_dim: int = 1024
+    milvus_db_path: str = "data/milvus/baihelp.db"
+    retrieval_top_k: int = 3
+    retrieval_score_threshold: float = 0.5
+    chunk_max_chars: int = 500
+    chunk_overlap_chars: int = 80
+    qa_mine_batch_size: int = 4
 
     model_config = SettingsConfigDict(env_file=".env")
 

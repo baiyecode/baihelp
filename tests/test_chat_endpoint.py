@@ -58,7 +58,7 @@ def _install_fakes(
     真实模型工厂与真实配置都不会被触达。
     """
     fake = FakeModel(chunks, fail_on=fail_on)
-    settings = Settings(_env_file=None, llm_api_key="sk-test")
+    settings = Settings(_env_file=None, llm_api_key="sk-test", embedding_api_key="e")
     monkeypatch.setattr(chat_api, "get_model", lambda: fake)
     monkeypatch.setattr(chat_api, "get_settings", lambda: settings)
     return fake
@@ -92,7 +92,7 @@ async def client(
         monkeypatch.setattr(chat_api, "get_session_factory", lambda request: factory)
         app.state.store = SessionStore()
         app.state.tool_registry = build_default_registry(
-            Settings(_env_file=None, llm_api_key="sk-test")
+            Settings(_env_file=None, llm_api_key="sk-test", embedding_api_key="e")
         )
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"

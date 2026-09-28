@@ -57,7 +57,7 @@ def _install_fake(
     真实模型工厂与真实配置都不会被触达。
     """
     fake = FakeModel(parsed=parsed, error=error)
-    settings = Settings(_env_file=None, llm_api_key="sk-test")
+    settings = Settings(_env_file=None, llm_api_key="sk-test", embedding_api_key="e")
     monkeypatch.setattr(extract_api, "get_model", lambda: fake)
     monkeypatch.setattr(extract_api, "get_settings", lambda: settings)
     return fake
