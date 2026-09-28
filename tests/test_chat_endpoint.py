@@ -20,6 +20,7 @@ from app.db.engine import build_session_factory
 from app.main import app
 from app.services.history import SessionStore
 from app.tools import build_default_registry, get_all_tools
+from tests.test_tools_db import FakeRetriever
 
 
 class FakeModel:
@@ -79,10 +80,12 @@ async def client(
 ) -> AsyncIterator[httpx.AsyncClient]:
     """每个测试独立会话存储与会话工厂，避免跨测试串扰。
 
-    ASGITransport 不触发 lifespan,故端点依赖的两样在此手工补齐:
+    ASGITransport 不触发 lifespan,故端点依赖的三样在此手工补齐:
     - monkeypatch ``chat_api.get_session_factory`` 注入 SQLite 内存工厂
       (StaticPool 共享同一连接 + create_all,写穿落库有表可写);
-    - app.state.tool_registry 挂真五工具注册表(与 lifespan 组装同构)。
+    - app.state.tool_registry 挂真五工具注册表(与 lifespan 组装同构);
+    - app.state.retriever 挂空结果 FakeRetriever:get_retriever 的缺省取用来源
+      (与 lifespan 组装同构,假模型不发工具申请单,此处仅备而不用)。
     """
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     try:
@@ -94,6 +97,7 @@ async def client(
         app.state.tool_registry = build_default_registry(
             Settings(_env_file=None, llm_api_key="sk-test", embedding_api_key="e")
         )
+        app.state.retriever = FakeRetriever([])
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as async_client:
@@ -202,3 +206,12 @@ def test_endpoint_persistence_uses_app_state_factory() -> None:
     request = Request({"type": "http", "app": fresh_app})
 
     assert chat_api.get_session_factory(request) is fresh_app.state.session_factory
+
+
+def test_endpoint_retriever_uses_app_state_retriever() -> None:
+    """检索器缝:query_faq 用的是 lifespan 预建那只检索器,get_retriever(request) 原样返回 app.state.retriever。"""
+    fresh_app = FastAPI()
+    fresh_app.state.retriever = object()  # 哨兵:只验身份,不需要真检索器
+    request = Request({"type": "http", "app": fresh_app})
+
+    assert chat_api.get_retriever(request) is fresh_app.state.retriever

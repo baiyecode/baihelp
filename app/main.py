@@ -21,19 +21,45 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 启动即加载配置：缺 LLM_API_KEY 等配置错误 fail-fast（spec §7.1）。
     # 只放 lifespan 而非模块导入期，保证测试/工具 import 本模块无需真实 key。
     get_settings()
+    # ch03 检索三件套同样延迟到 lifespan 导入:pymilvus 导入即对仓库根 .env 执行
+    # load_dotenv(实测见 test_knowledge_milvus_repo.py 顶部注),放模块导入期会让
+    # import app.main 污染 os.environ;嵌入客户端本无副作用,随检索器一并组装。
+    from app.knowledge.embedding import BgeM3Embedder
+    from app.knowledge.milvus_repo import MilvusKnowledgeRepo
+    from app.knowledge.retriever import KnowledgeRetriever
+
+    settings = get_settings()
     # 启动即 SELECT 1 探活：DB 连不上直接 raise 让启动失败（fail-fast），
     # ping 的错误消息自带「docker compose up -d + 建表 DDL」操作提示（spec §7.6）。
     # MySQL 端绝不 create_all——建表唯一依据是用户 DDL。
-    engine = build_engine(get_settings().database_url)
+    engine = build_engine(settings.database_url)
+    # Milvus 仓储在 try 外构造:文件打不开等失败同样 fail-fast,finally 统一 close
+    repo = MilvusKnowledgeRepo(settings.milvus_db_path, settings.embedding_dim)
     try:
         await ping(engine)
         # 会话工厂与工具注册表挂 app.state 供端点取用；注册表同样放 lifespan
         # 而非 create_app：它读 settings，放导入期会让 import 本模块也要真实配置。
         app.state.session_factory = build_session_factory(engine)
-        app.state.tool_registry = build_default_registry(get_settings())
+        app.state.tool_registry = build_default_registry(settings)
+        # 语义检索器挂 app.state(query_faq 注入用):嵌入客户端 + 建集合(幂等)
+        # + 检索器,组装失败(如 Milvus 文件权限)一并 fail-fast 启动失败
+        embedder = BgeM3Embedder(
+            settings.embedding_base_url,
+            settings.embedding_api_key,
+            settings.embedding_model,
+            settings.embedding_dim,
+        )
+        repo.ensure_collection()
+        app.state.retriever = KnowledgeRetriever(
+            embedder,
+            repo,
+            top_k=settings.retrieval_top_k,
+            score_threshold=settings.retrieval_score_threshold,
+        )
         yield
     finally:
-        # 无论探活成败还是正常关停都释放连接池，杜绝引擎悬挂
+        # 无论探活成败还是正常关停都释放资源,杜绝引擎/Milvus 客户端悬挂
+        repo.close()
         await engine.dispose()
 
 

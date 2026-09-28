@@ -8,6 +8,7 @@ r"""流式客服回复编排:写穿落库 → 历史裁剪 → 两段式生成(�
 
 import logging
 from collections.abc import AsyncIterator
+from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
@@ -45,11 +46,14 @@ async def stream_chat_reply(
     *,
     registry: ToolRegistry | None = None,
     persistence: ChatPersistence | None = None,
+    retriever: Any | None = None,
 ) -> AsyncIterator[str]:
     """为一次用户消息产出可直接下发的 SSE 事件流。
 
-    - registry/persistence 为带 None 默认的关键字参数(R1 裁决):registry=None
-      不绑工具(单段,同 ch01);persistence=None 跳过写穿(仅内存,同 ch01);
+    - registry/persistence/retriever 为带 None 默认的关键字参数(R1 裁决):
+      registry=None 不绑工具(单段,同 ch01);persistence=None 跳过写穿
+      (仅内存,同 ch01);retriever=None 时 ToolContext.retriever 为 None,
+      registry 对 None 跳过注入(调 query_faq 会得到错误文本,由模型解释);
     - 取会话历史,连同渲染后的 system 消息与新消息一起经 trimmer 预算裁剪
       (system 恒为 messages[0],裁剪器约定如此;历史为内部活列表,绝不变异);
     - 第一段逐 chunk 下发 delta(空文本 chunk 跳过)同时聚合;聚合含 tool_calls
@@ -108,6 +112,7 @@ async def stream_chat_reply(
                             if persistence is not None
                             else None
                         ),
+                        retriever=retriever,
                     ),
                 )
                 yield format_tool_event(

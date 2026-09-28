@@ -28,6 +28,8 @@ class ToolContext:
 
     conversation_id: int
     session_factory: Any
+    # ch03 语义检索器:query_faq 的第二个注入依赖;None 时 registry 照旧跳过注入
+    retriever: Any | None = None
 
 
 @dataclass

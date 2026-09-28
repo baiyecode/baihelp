@@ -31,10 +31,12 @@ from sqlalchemy.pool import StaticPool
 from app.db import models
 from app.db.base import Base
 from app.db.engine import build_session_factory
+from app.knowledge.retriever import RetrievedKnowledge
 from app.tools import get_all_tools
 from app.tools.ecommerce import query_order
 from app.tools.knowledge import query_faq
 from app.tools.registry import ToolContext, ToolExecutionResult, ToolRegistry
+from tests.test_tools_db import FakeRetriever
 
 # ---------------------------------------------------------------------------
 # 测试用假工具(@tool 包装,与真实工具同为 StructuredTool)
@@ -284,10 +286,24 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 async def test_execute_real_query_faq_with_context_injection(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """真实 DB 工具端到端:registry 把 ToolContext.session_factory 注入 query_faq 并返回命中文本。"""
+    """真实 DB 工具端到端:registry 把 ToolContext 的 session_factory/retriever 注入 query_faq 并返回命中文本。"""
     registry = ToolRegistry()
     registry.register(query_faq)
-    context = ToolContext(conversation_id=1, session_factory=session_factory)
+    context = ToolContext(
+        conversation_id=1,
+        session_factory=session_factory,
+        retriever=FakeRetriever(
+            [
+                RetrievedKnowledge(
+                    chunk_id=1,
+                    category="售后",
+                    questions="退货政策是什么?",
+                    answer="签收后7天内支持无理由退货,需保持商品完好。",
+                    score=0.9,
+                )
+            ]
+        ),
+    )
 
     result = await registry.execute("query_faq", {"keyword": "退货"}, context)
 
