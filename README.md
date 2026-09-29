@@ -22,7 +22,7 @@
 
 **工具调用(Ch02)**
 
-- 五个业务工具以 `@tool` 注册:`query_order` / `query_product` / `query_logistics`(内部 mock,不接真实接口)、`query_faq`(SQL LIKE 查 faq 表)、`create_ticket`(写 tickets 表);模型自主决定调不调、调哪个
+- 五个业务工具以 `@tool` 注册:`query_order` / `query_product` / `query_logistics`(内部 mock,不接真实接口)、`query_faq`(FAQ 检索,ch02 时 SQL LIKE 查表,ch03 起内部换向量语义检索)、`create_ticket`(写 tickets 表);模型自主决定调不调、调哪个
 - 单轮收敛 — 第一段绑工具流式,聚合出工具调用则执行并把结果回灌,第二段用裸模型流式最终回答(结构上杜绝连环调用)
 - 工具基础设施 — ToolRegistry 统一注册管理、Pydantic 参数校验、超时重试、错误捕获后回灌模型
 - MySQL 写穿 — user / assistant / tool 消息实时落 conversations / messages 表;建表 DDL 见 `scripts/sql/ch02-ddl.sql`
@@ -30,9 +30,10 @@
 
 **RAG 知识库(Ch03)**
 
-- 结构感知切分 — `data/knowledge/*.md` 语料(front-matter 带 category / key_clauses 元数据)按标题层级切块入库,`section_path` 保留「根分类 > 章 > 节」归属
-- 历史会话挖知识 — `python -m app.knowledge.mine_qa` 分批抽取历史客服会话中的 QA 对,暂存 → 整体去重 → 入库知识块;`--self-test` 提供零外部依赖的离线自检
-- 向量检索双写 — 建库编排把知识块写 MySQL、向量写 Milvus Lite(自然键幂等 + pending 补齐 + vector_id 回填);`query_faq` 对外契约不变,内部从 SQL LIKE 切换为向量语义检索,根治关键词漏召回
+- 结构感知切分 — `data/knowledge/*.md` 语料(front-matter 带 category / key_clauses 元数据)按标题层级切块入库,`section_path` 保留「根分类 > 章 > 节」归属;超长递归切、相邻块重叠裁到句边界、大表格按行切每块复制表头
+- 历史会话挖知识 — `python -m app.knowledge.mine_qa` 分批抽取历史客服会话中的 QA 对,暂存 → 整体去重 → 入库知识块;敷衍回答与个案查询被 Prompt 规则挡在门外;`--self-test` 提供零外部依赖的离线自检
+- 向量检索双写 — 建库编排把知识块写 MySQL(原文权威源)、向量写 Milvus Lite 本地文件库(零额外容器;自然键幂等 + pending 补齐 + vector_id 回填),**建库中断后重跑自动补漏**;`query_faq` 对外契约不变,内部从 SQL LIKE 切换为向量语义检索,根治关键词漏召回
+- 检索质量门禁 — 检索评估集(含「邮费是多少」「快递费怎么算」换说法与无关问题反例)+ 挖矿评估集(含噪音会话零抽取反例)双 live 门禁,结果归档 `evals/report.md`
 
 ## 快速开始
 
@@ -46,8 +47,8 @@ uv sync
 cp .env.example .env        # 填入 LLM_API_KEY 与 EMBEDDING_API_KEY;本地 .env 的 DATABASE_URL 端口改成 3307(见下)
 mkdir -p data/milvus        # 必建:启动期 MilvusClient 不自建父目录,而该目录已被 gitignore(fresh clone 没有)
 
-docker compose up -d        # 起 MySQL(宿主 3307,首启自动按 scripts/sql/ch02-ddl.sql 建表)
-uv run python -m app.db.seed  # 幂等灌测试数据(FAQ 8 条 / 演示会话 / 演示工单)
+docker compose up -d        # 起 MySQL(宿主 3307,首启自动按 scripts/sql/*.sql 建 ch02+ch03 全部表)
+uv run python -m app.db.seed  # 幂等灌测试数据(FAQ 8 条 / 演示会话与工单 / 8 通挖矿语料历史会话)
 uv run python -m app.knowledge.ingest  # 建知识库(必须):语料切块入 MySQL + 批量向量化双写 Milvus
 uv run python -m app.knowledge.mine_qa  # 可选:从历史客服会话挖 QA 对入库(走真 LLM;--self-test 可零依赖自检;挖出的块为待向量化状态,重跑一次 ingest 后可被检索)
 
@@ -56,6 +57,9 @@ uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 
 ```
 
 > 端口说明:容器内 MySQL 是 3306,docker-compose 映射到宿主 **3307**(避开常见的本机 MySQL 服务);`.env.example` 的默认值是 3306,本地跑请把 `DATABASE_URL` 的端口改成 3307。
+>
+> 存量库升级(ch02 时代建的卷,initdb 不会重跑):手动灌一次 ch03 DDL 即可,无需清卷——
+> `docker exec -i baihelp-mysql mysql -ubaihelp -pbaihelp --default-character-set=utf8mb4 baihelp < scripts/sql/ch03-ddl.sql`
 
 ### 体验演示
 
@@ -69,7 +73,7 @@ uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 
 
 ### 模型供应商
 
-应用侧统一 OpenAI 协议(`init_chat_model`),改 `.env` 即可换接;工具调用要求所接模型支持 function calling。
+应用侧统一 OpenAI 协议(`init_chat_model`),改 `.env` 即可换接;工具调用要求所接模型支持 function calling。嵌入侧独立配置(`EMBEDDING_*`,默认 SiliconFlow 的 `BAAI/bge-m3`,与 LLM 供应商互不影响)。
 
 | 供应商 | `LLM_BASE_URL` | `LLM_MODEL` 示例 |
 |---|---|---|
@@ -99,8 +103,8 @@ uv run uvicorn app.main:app   # 启动即 ping 数据库,连不上会 fail-fast 
 ## 验证
 
 ```bash
-uv run pytest                                # 158 个单元测试
-bash scripts/acceptance.sh                   # 端到端 7 判据:流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 向量召回 / 挖矿自检
+uv run pytest                                # 159 个单元测试
+bash scripts/acceptance.sh                   # 端到端 7 条验收(11 项判据):流式 / 上下文记忆 / 结构化抽取 / 工具调用 / FAQ 命中 / 向量召回 / 挖矿自检
 uv run python evals/run_eval.py              # Ch01 抽取评估(22 例,字段级门禁)
 uv run python evals/run_tool_eval.py         # Ch02 工具选型评估(19 例,门禁:整体 ≥90% / 闲聊误调 0)
 uv run python evals/run_mine_eval.py         # Ch03 挖矿抽取评估(14 例,门禁:expect 全满足 / 噪音 0 抽取;--self-test 离线自检)
@@ -134,7 +138,7 @@ dev-notes/           # 开发过程逐阶段留痕(ch01 / ch02 / ch03)
 
 ## 开发方法
 
-每章走完整 Superpowers 流程:brainstorm → 设计 spec(用户评审)→ 实施计划 → subagent-driven 逐任务实现(每任务独立实现者 + 评审者,TDD;模型行为类产出以标注评估集替代单测)→ live 验收 → 全分支 code review。过程按「每完成一个阶段追记一段」的规则落在 [dev-notes/ch01.md](dev-notes/ch01.md) 与 [dev-notes/ch02.md](dev-notes/ch02.md)。
+每章走完整 Superpowers 流程:brainstorm → 设计 spec(用户评审)→ 实施计划 → subagent-driven 逐任务实现(每任务独立实现者 + 评审者,TDD;模型行为类产出以标注评估集替代单测)→ live 验收 → 全分支 code review。过程按「每完成一个阶段追记一段」的规则落在 [dev-notes/ch01.md](dev-notes/ch01.md)、[dev-notes/ch02.md](dev-notes/ch02.md) 与 [dev-notes/ch03.md](dev-notes/ch03.md)。
 
 ## 路线图
 
